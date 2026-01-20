@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import Logo from '../components/Logo';
+import Header from '../components/Header';
 import Footer from '../components/Footer';
 
 const FamilyViewMode = () => {
@@ -125,32 +126,7 @@ const FamilyViewMode = () => {
       </div>
 
       {/* Header */}
-      <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-stone-100">
-        <div className="px-6 md:px-12 lg:px-20 mx-auto max-w-6xl h-16 flex items-center justify-between">
-          <Link to="/">
-            <Logo size="sm" />
-          </Link>
-          <nav className="hidden md:flex items-center gap-10">
-            <Link to="/dashboard" className="text-stone-400 text-sm font-medium hover:text-stone-600 transition-colors">My Matches</Link>
-            <Link to="/family-view" className="text-[#1a1a1a] text-sm font-semibold">Family View</Link>
-            <Link to="/messages" className="text-stone-400 text-sm font-medium hover:text-stone-600 transition-colors">Messages</Link>
-            <Link to="/create-profile" className="text-stone-400 text-sm font-medium hover:text-stone-600 transition-colors">Profile</Link>
-          </nav>
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => setShowFilters(!showFilters)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium border transition-all ${
-                showFilters 
-                  ? 'bg-stone-100 border-stone-200 text-stone-700' 
-                  : 'border-stone-200 text-stone-500 hover:border-stone-300'
-              }`}
-            >
-              <span className="material-symbols-outlined text-lg">tune</span>
-              Filters
-            </button>
-          </div>
-        </div>
-      </header>
+      <Header />
 
       {/* Collapsible Filters */}
       {showFilters && (
@@ -209,20 +185,19 @@ const FamilyViewMode = () => {
         {/* Profile Cards */}
         <div className="flex flex-col gap-8">
           {profiles.map((profile) => (
-            <article 
-              key={profile.id} 
-              className={`bg-white rounded-2xl overflow-hidden shadow-sm border ${
-                flagged.includes(profile.id) 
-                  ? 'border-amber-200' 
-                  : shortlisted.includes(profile.id)
-                    ? 'border-green-200'
-                    : 'border-stone-100'
-              }`}
+            <article
+              key={profile.id}
+              className={`bg-white rounded-2xl overflow-hidden shadow-sm border ${flagged.includes(profile.id)
+                ? 'border-amber-200'
+                : shortlisted.includes(profile.id)
+                  ? 'border-green-200'
+                  : 'border-stone-100'
+                }`}
             >
               <div className="flex flex-col lg:flex-row">
                 {/* Photo Section - Protected */}
                 <div className="relative w-full lg:w-[280px] shrink-0">
-                  <div 
+                  <div
                     className="aspect-[4/5] lg:aspect-auto lg:h-full w-full bg-stone-100 bg-cover bg-center"
                     style={{ backgroundImage: `url('${profile.image}')` }}
                   ></div>
@@ -256,11 +231,10 @@ const FamilyViewMode = () => {
                       <h2 className="text-xl font-serif font-medium text-[#1a1a1a]">
                         {profile.name}, {profile.age}
                       </h2>
-                      <div className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                        profile.compatibility === 'Strong'
-                          ? 'bg-green-50 text-green-700 border border-green-100'
-                          : 'bg-amber-50 text-amber-700 border border-amber-100'
-                      }`}>
+                      <div className={`px-3 py-1 rounded-full text-xs font-semibold ${profile.compatibility === 'Strong'
+                        ? 'bg-green-50 text-green-700 border border-green-100'
+                        : 'bg-amber-50 text-amber-700 border border-amber-100'
+                        }`}>
                         {profile.compatibility} Alignment
                       </div>
                     </div>
@@ -340,7 +314,7 @@ const FamilyViewMode = () => {
                         onChange={(e) => handleNoteChange(profile.id, e.target.value)}
                       />
                       <div className="flex justify-end mt-2">
-                        <button 
+                        <button
                           onClick={() => setActiveNoteId(null)}
                           className="text-sm text-stone-500 hover:text-stone-700"
                         >
@@ -355,7 +329,7 @@ const FamilyViewMode = () => {
                           <h4 className="text-xs font-semibold uppercase tracking-wider text-blue-400 mb-1">Your Notes</h4>
                           <p className="text-sm text-stone-600">{notes[profile.id]}</p>
                         </div>
-                        <button 
+                        <button
                           onClick={() => setActiveNoteId(profile.id)}
                           className="text-blue-500 hover:text-blue-700"
                         >
@@ -368,45 +342,43 @@ const FamilyViewMode = () => {
                   {/* Actions - Family View Specific */}
                   <div className="flex items-center gap-3 mt-auto pt-4 border-t border-stone-100">
                     {/* Shortlist / Recommend */}
-                    <button 
+                    <button
                       onClick={() => handleShortlist(profile.id)}
-                      className={`h-11 px-5 rounded-full font-medium text-sm transition-all flex items-center gap-2 ${
-                        shortlisted.includes(profile.id)
-                          ? 'bg-green-500 text-white'
-                          : 'border border-green-200 text-green-700 hover:bg-green-50'
-                      }`}
+                      className={`h-11 px-5 rounded-full font-medium text-sm transition-all flex items-center gap-2 ${shortlisted.includes(profile.id)
+                        ? 'bg-green-500 text-white'
+                        : 'border border-green-200 text-green-700 hover:bg-green-50'
+                        }`}
                     >
                       <span className="material-symbols-outlined text-lg">
                         {shortlisted.includes(profile.id) ? 'check' : 'bookmark'}
                       </span>
                       {shortlisted.includes(profile.id) ? 'Shortlisted' : 'Shortlist'}
                     </button>
-                    
+
                     {/* Add Notes */}
-                    <button 
+                    <button
                       onClick={() => setActiveNoteId(profile.id)}
                       className="h-11 px-5 border border-stone-200 hover:border-stone-300 hover:bg-stone-50 text-stone-600 rounded-full font-medium text-sm transition-all flex items-center gap-2"
                     >
                       <span className="material-symbols-outlined text-lg">note_add</span>
                       {notes[profile.id] ? 'Edit Notes' : 'Add Notes'}
                     </button>
-                    
+
                     {/* Flag for Discussion */}
-                    <button 
+                    <button
                       onClick={() => handleFlag(profile.id)}
-                      className={`h-11 px-5 rounded-full font-medium text-sm transition-all flex items-center gap-2 ${
-                        flagged.includes(profile.id)
-                          ? 'bg-amber-500 text-white'
-                          : 'border border-amber-200 text-amber-700 hover:bg-amber-50'
-                      }`}
+                      className={`h-11 px-5 rounded-full font-medium text-sm transition-all flex items-center gap-2 ${flagged.includes(profile.id)
+                        ? 'bg-amber-500 text-white'
+                        : 'border border-amber-200 text-amber-700 hover:bg-amber-50'
+                        }`}
                     >
                       <span className="material-symbols-outlined text-lg">flag</span>
                       {flagged.includes(profile.id) ? 'Flagged' : 'Flag for Discussion'}
                     </button>
 
                     {/* View Full Profile */}
-                    <Link 
-                      to="/match-detail" 
+                    <Link
+                      to="/match-detail"
                       className="h-11 px-5 border border-stone-200 hover:border-stone-300 hover:bg-stone-50 text-stone-600 rounded-full font-medium text-sm transition-all flex items-center gap-2 ml-auto"
                     >
                       View Full Profile

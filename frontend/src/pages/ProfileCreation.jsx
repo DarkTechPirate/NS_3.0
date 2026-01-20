@@ -1,9 +1,14 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import Logo from '../components/Logo';
-
+import Header from '../components/Header';
+import { uploadProfileImage } from '../services/api';
+import { useAuth } from '../context/AuthContext';
 const ProfileCreation = () => {
+  const { user, setUser } = useAuth();
+  const navigate = useNavigate();
   const [activeSection, setActiveSection] = useState('personal');
+  const [uploading, setUploading] = useState(false);
   const [formData, setFormData] = useState({
     // Personal Overview
     firstName: '',
@@ -48,6 +53,61 @@ const ProfileCreation = () => {
     photos: []
   });
 
+  // Pre-fill form if user data exists
+  React.useEffect(() => {
+    if (user) {
+      setFormData(prev => ({
+        ...prev,
+        // Root Fields
+        firstName: user.fullname ? user.fullname.split(' ')[0] : '',
+        lastName: user.fullname ? user.fullname.split(' ').slice(1).join(' ') : '',
+        gender: user.gender || '',
+
+        // Personal
+        dateOfBirth: user.personalDetails?.dob ? new Date(user.personalDetails.dob).toISOString().split('T')[0] : '',
+        height: user.personalDetails?.height || '',
+        maritalStatus: user.personalDetails?.maritalStatus || 'never-married',
+        religion: user.personalDetails?.religion || '',
+        community: user.personalDetails?.community || '',
+        caste: user.personalDetails?.caste || '',
+        motherTongue: user.personalDetails?.motherTongue || '',
+        aboutText: user.personalDetails?.about || '',
+
+        // Career
+        highestEducation: user.careerDetails?.education || '',
+        fieldOfStudy: user.careerDetails?.fieldOfStudy || '',
+        institution: user.careerDetails?.institution || '',
+        currentProfession: user.careerDetails?.profession || '',
+        employer: user.careerDetails?.employer || '',
+        annualIncome: user.careerDetails?.income || '',
+        workLocation: user.careerDetails?.workLocation || '',
+
+        // Family
+        fatherName: user.familyDetails?.fatherName || '',
+        fatherOccupation: user.familyDetails?.fatherOccupation || '',
+        motherName: user.familyDetails?.motherName || '',
+        motherOccupation: user.familyDetails?.motherOccupation || '',
+        siblings: user.familyDetails?.siblings || '',
+        familyType: user.familyDetails?.familyType || '',
+        familyValues: user.familyDetails?.familyValues || '',
+        familyLocation: user.familyDetails?.familyLocation || '',
+
+        // Lifestyle
+        dietPreference: user.lifestyleDetails?.diet || '',
+        drinkingHabit: user.lifestyleDetails?.drinking || '',
+        smokingHabit: user.lifestyleDetails?.smoking || '',
+        hobbies: user.lifestyleDetails?.hobbies || [],
+        livingArrangement: user.lifestyleDetails?.livingArrangement || '',
+
+        // Preferences
+        relocate: user.preferences?.relocate || false,
+
+        // Photos
+        photos: user.profileImages || (user.profilePicture ? [user.profilePicture] : []),
+      }));
+    }
+  }, [user]);
+
   // Comprehensive Indian Religion, Community, and Caste Data
   const religions = [
     'Hindu',
@@ -65,7 +125,7 @@ const ProfileCreation = () => {
 
   const communitiesByReligion = {
     'Hindu': [
-      'Brahmin', 'Kshatriya', 'Vaishya', 'Kayastha', 'Maratha', 'Rajput', 'Nair', 'Naidu', 
+      'Brahmin', 'Kshatriya', 'Vaishya', 'Kayastha', 'Maratha', 'Rajput', 'Nair', 'Naidu',
       'Reddy', 'Kamma', 'Kapu', 'Gounder', 'Chettiar', 'Mudaliar', 'Thevar', 'Vanniyar',
       'Yadav', 'Kurmi', 'Jat', 'Gujjar', 'Patel', 'Agarwal', 'Baniya', 'Maheshwari',
       'Oswal', 'Khatri', 'Arora', 'Bhumihar', 'Tyagi', 'Saini', 'Ahir', 'Lingayat',
@@ -170,7 +230,7 @@ const ProfileCreation = () => {
 
   const handleInputChange = (field, value) => {
     setFormData({ ...formData, [field]: value });
-    
+
     // Reset dependent fields when religion changes
     if (field === 'religion') {
       setFormData({ ...formData, religion: value, community: '', caste: '' });
@@ -192,7 +252,7 @@ const ProfileCreation = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="flex flex-col gap-2">
             <label className="text-sm font-bold text-slate-grey ml-2">First Name *</label>
-            <input 
+            <input
               className="w-full bg-white border border-subtle-border rounded-full px-5 py-3 text-charcoal placeholder-slate-grey/30 focus:border-rajkumari focus:ring-1 focus:ring-rajkumari transition-all shadow-sm"
               placeholder="Enter your first name"
               type="text"
@@ -202,7 +262,7 @@ const ProfileCreation = () => {
           </div>
           <div className="flex flex-col gap-2">
             <label className="text-sm font-bold text-slate-grey ml-2">Last Name *</label>
-            <input 
+            <input
               className="w-full bg-white border border-subtle-border rounded-full px-5 py-3 text-charcoal placeholder-slate-grey/30 focus:border-rajkumari focus:ring-1 focus:ring-rajkumari transition-all shadow-sm"
               placeholder="Enter your last name"
               type="text"
@@ -214,7 +274,7 @@ const ProfileCreation = () => {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="flex flex-col gap-2">
             <label className="text-sm font-bold text-slate-grey ml-2">Date of Birth *</label>
-            <input 
+            <input
               className="w-full bg-white border border-subtle-border rounded-full px-5 py-3 text-charcoal placeholder-slate-grey/30 focus:border-rajkumari focus:ring-1 focus:ring-rajkumari transition-all shadow-sm"
               type="date"
               value={formData.dateOfBirth}
@@ -224,7 +284,7 @@ const ProfileCreation = () => {
           <div className="flex flex-col gap-2">
             <label className="text-sm font-bold text-slate-grey ml-2">Gender *</label>
             <div className="relative">
-              <select 
+              <select
                 className="w-full appearance-none bg-white border border-subtle-border rounded-full px-5 py-3 text-charcoal focus:border-rajkumari focus:ring-1 focus:ring-rajkumari transition-all pr-10 shadow-sm cursor-pointer"
                 value={formData.gender}
                 onChange={(e) => handleInputChange('gender', e.target.value)}
@@ -239,7 +299,7 @@ const ProfileCreation = () => {
           <div className="flex flex-col gap-2">
             <label className="text-sm font-bold text-slate-grey ml-2">Height</label>
             <div className="relative">
-              <select 
+              <select
                 className="w-full appearance-none bg-white border border-subtle-border rounded-full px-5 py-3 text-charcoal focus:border-rajkumari focus:ring-1 focus:ring-rajkumari transition-all pr-10 shadow-sm cursor-pointer"
                 value={formData.height}
                 onChange={(e) => handleInputChange('height', e.target.value)}
@@ -262,7 +322,7 @@ const ProfileCreation = () => {
           <div className="flex flex-col gap-2">
             <label className="text-sm font-bold text-slate-grey ml-2">Religion *</label>
             <div className="relative">
-              <select 
+              <select
                 className="w-full appearance-none bg-white border border-subtle-border rounded-full px-5 py-3 text-charcoal focus:border-rajkumari focus:ring-1 focus:ring-rajkumari transition-all pr-10 shadow-sm cursor-pointer"
                 value={formData.religion}
                 onChange={(e) => handleInputChange('religion', e.target.value)}
@@ -276,7 +336,7 @@ const ProfileCreation = () => {
           <div className="flex flex-col gap-2">
             <label className="text-sm font-bold text-slate-grey ml-2">Community</label>
             <div className="relative">
-              <select 
+              <select
                 className="w-full appearance-none bg-white border border-subtle-border rounded-full px-5 py-3 text-charcoal focus:border-rajkumari focus:ring-1 focus:ring-rajkumari transition-all pr-10 shadow-sm cursor-pointer"
                 value={formData.community}
                 onChange={(e) => handleInputChange('community', e.target.value)}
@@ -295,7 +355,7 @@ const ProfileCreation = () => {
           <div className="flex flex-col gap-2">
             <label className="text-sm font-bold text-slate-grey ml-2">Caste / Sub-community</label>
             <div className="relative">
-              <select 
+              <select
                 className="w-full appearance-none bg-white border border-subtle-border rounded-full px-5 py-3 text-charcoal focus:border-rajkumari focus:ring-1 focus:ring-rajkumari transition-all pr-10 shadow-sm cursor-pointer"
                 value={formData.caste}
                 onChange={(e) => handleInputChange('caste', e.target.value)}
@@ -313,7 +373,7 @@ const ProfileCreation = () => {
           <div className="flex flex-col gap-2">
             <label className="text-sm font-bold text-slate-grey ml-2">Mother Tongue *</label>
             <div className="relative">
-              <select 
+              <select
                 className="w-full appearance-none bg-white border border-subtle-border rounded-full px-5 py-3 text-charcoal focus:border-rajkumari focus:ring-1 focus:ring-rajkumari transition-all pr-10 shadow-sm cursor-pointer"
                 value={formData.motherTongue}
                 onChange={(e) => handleInputChange('motherTongue', e.target.value)}
@@ -335,7 +395,7 @@ const ProfileCreation = () => {
             <label className="text-sm font-bold text-slate-grey ml-2">Current City *</label>
             <div className="relative group">
               <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-slate-grey/40 group-focus-within:text-rajkumari transition-colors">location_on</span>
-              <input 
+              <input
                 className="w-full bg-white border border-subtle-border rounded-full pl-12 pr-5 py-3 text-charcoal placeholder-slate-grey/30 focus:border-rajkumari focus:ring-1 focus:ring-rajkumari transition-all shadow-sm"
                 placeholder="City, State"
                 type="text"
@@ -345,7 +405,7 @@ const ProfileCreation = () => {
             </div>
           </div>
           <div className="flex items-center gap-3 ml-2">
-            <input 
+            <input
               className="w-5 h-5 rounded border-subtle-border bg-white text-rajkumari focus:ring-rajkumari focus:ring-offset-ivory"
               id="relocate"
               type="checkbox"
@@ -365,7 +425,7 @@ const ProfileCreation = () => {
         </div>
         <div className="flex flex-col gap-2">
           <div className="relative">
-            <textarea 
+            <textarea
               className="w-full bg-white border border-subtle-border rounded-2xl px-5 py-4 text-charcoal placeholder-slate-grey/30 focus:border-rajkumari focus:ring-1 focus:ring-rajkumari transition-all resize-none shadow-sm"
               placeholder="Write a brief introduction about who you are beyond your profession. What drives you? How do you spend your weekends?"
               rows="6"
@@ -384,9 +444,9 @@ const ProfileCreation = () => {
         <div className="flex flex-wrap gap-3">
           {['never-married', 'divorced', 'widowed', 'annulled'].map((status) => (
             <label key={status} className="cursor-pointer">
-              <input 
-                type="radio" 
-                name="marital_status" 
+              <input
+                type="radio"
+                name="marital_status"
                 className="peer sr-only"
                 checked={formData.maritalStatus === status}
                 onChange={() => handleInputChange('maritalStatus', status)}
@@ -406,10 +466,10 @@ const ProfileCreation = () => {
           <span className="text-xs text-slate-grey/60 mb-1">Image file (JPG, PNG, PDF)</span>
         </div>
         <div className="bg-stone-50 border-2 border-dashed border-stone-200 rounded-xl p-8 text-center hover:border-rajkumari/40 hover:bg-rajkumari/5 transition-all cursor-pointer group">
-          <input 
-            type="file" 
-            id="jathagam-upload" 
-            className="hidden" 
+          <input
+            type="file"
+            id="jathagam-upload"
+            className="hidden"
             accept="image/*,.pdf"
             onChange={(e) => handleInputChange('jathagam', e.target.files[0])}
           />
@@ -446,7 +506,7 @@ const ProfileCreation = () => {
           <div className="flex flex-col gap-2">
             <label className="text-sm font-bold text-slate-grey ml-2">Highest Education</label>
             <div className="relative">
-              <select 
+              <select
                 className="w-full appearance-none bg-white border border-subtle-border rounded-full px-5 py-3 text-charcoal focus:border-rajkumari focus:ring-1 focus:ring-rajkumari transition-all pr-10 shadow-sm cursor-pointer"
                 value={formData.highestEducation}
                 onChange={(e) => handleInputChange('highestEducation', e.target.value)}
@@ -459,7 +519,7 @@ const ProfileCreation = () => {
           </div>
           <div className="flex flex-col gap-2">
             <label className="text-sm font-bold text-slate-grey ml-2">Field of Study</label>
-            <input 
+            <input
               className="w-full bg-white border border-subtle-border rounded-full px-5 py-3 text-charcoal placeholder-slate-grey/30 focus:border-rajkumari focus:ring-1 focus:ring-rajkumari transition-all shadow-sm"
               placeholder="e.g., Computer Science, Medicine"
               type="text"
@@ -470,7 +530,7 @@ const ProfileCreation = () => {
         </div>
         <div className="flex flex-col gap-2">
           <label className="text-sm font-bold text-slate-grey ml-2">Institution / University</label>
-          <input 
+          <input
             className="w-full bg-white border border-subtle-border rounded-full px-5 py-3 text-charcoal placeholder-slate-grey/30 focus:border-rajkumari focus:ring-1 focus:ring-rajkumari transition-all shadow-sm"
             placeholder="e.g., IIT Delhi, AIIMS, IIM Ahmedabad"
             type="text"
@@ -486,7 +546,7 @@ const ProfileCreation = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="flex flex-col gap-2">
             <label className="text-sm font-bold text-slate-grey ml-2">Current Profession</label>
-            <input 
+            <input
               className="w-full bg-white border border-subtle-border rounded-full px-5 py-3 text-charcoal placeholder-slate-grey/30 focus:border-rajkumari focus:ring-1 focus:ring-rajkumari transition-all shadow-sm"
               placeholder="e.g., Software Engineer, Doctor"
               type="text"
@@ -496,7 +556,7 @@ const ProfileCreation = () => {
           </div>
           <div className="flex flex-col gap-2">
             <label className="text-sm font-bold text-slate-grey ml-2">Employer / Company</label>
-            <input 
+            <input
               className="w-full bg-white border border-subtle-border rounded-full px-5 py-3 text-charcoal placeholder-slate-grey/30 focus:border-rajkumari focus:ring-1 focus:ring-rajkumari transition-all shadow-sm"
               placeholder="e.g., Google, Apollo Hospitals"
               type="text"
@@ -509,7 +569,7 @@ const ProfileCreation = () => {
           <div className="flex flex-col gap-2">
             <label className="text-sm font-bold text-slate-grey ml-2">Annual Income</label>
             <div className="relative">
-              <select 
+              <select
                 className="w-full appearance-none bg-white border border-subtle-border rounded-full px-5 py-3 text-charcoal focus:border-rajkumari focus:ring-1 focus:ring-rajkumari transition-all pr-10 shadow-sm cursor-pointer"
                 value={formData.annualIncome}
                 onChange={(e) => handleInputChange('annualIncome', e.target.value)}
@@ -522,7 +582,7 @@ const ProfileCreation = () => {
           </div>
           <div className="flex flex-col gap-2">
             <label className="text-sm font-bold text-slate-grey ml-2">Work Location</label>
-            <input 
+            <input
               className="w-full bg-white border border-subtle-border rounded-full px-5 py-3 text-charcoal placeholder-slate-grey/30 focus:border-rajkumari focus:ring-1 focus:ring-rajkumari transition-all shadow-sm"
               placeholder="e.g., Bangalore, Remote"
               type="text"
@@ -543,7 +603,7 @@ const ProfileCreation = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="flex flex-col gap-2">
             <label className="text-sm font-bold text-slate-grey ml-2">Father's Name</label>
-            <input 
+            <input
               className="w-full bg-white border border-subtle-border rounded-full px-5 py-3 text-charcoal placeholder-slate-grey/30 focus:border-rajkumari focus:ring-1 focus:ring-rajkumari transition-all shadow-sm"
               placeholder="Enter father's name"
               type="text"
@@ -553,7 +613,7 @@ const ProfileCreation = () => {
           </div>
           <div className="flex flex-col gap-2">
             <label className="text-sm font-bold text-slate-grey ml-2">Father's Occupation</label>
-            <input 
+            <input
               className="w-full bg-white border border-subtle-border rounded-full px-5 py-3 text-charcoal placeholder-slate-grey/30 focus:border-rajkumari focus:ring-1 focus:ring-rajkumari transition-all shadow-sm"
               placeholder="e.g., Retired IAS Officer, Business"
               type="text"
@@ -565,7 +625,7 @@ const ProfileCreation = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="flex flex-col gap-2">
             <label className="text-sm font-bold text-slate-grey ml-2">Mother's Name</label>
-            <input 
+            <input
               className="w-full bg-white border border-subtle-border rounded-full px-5 py-3 text-charcoal placeholder-slate-grey/30 focus:border-rajkumari focus:ring-1 focus:ring-rajkumari transition-all shadow-sm"
               placeholder="Enter mother's name"
               type="text"
@@ -575,7 +635,7 @@ const ProfileCreation = () => {
           </div>
           <div className="flex flex-col gap-2">
             <label className="text-sm font-bold text-slate-grey ml-2">Mother's Occupation</label>
-            <input 
+            <input
               className="w-full bg-white border border-subtle-border rounded-full px-5 py-3 text-charcoal placeholder-slate-grey/30 focus:border-rajkumari focus:ring-1 focus:ring-rajkumari transition-all shadow-sm"
               placeholder="e.g., Homemaker, Professor"
               type="text"
@@ -591,7 +651,7 @@ const ProfileCreation = () => {
         <h3 className="text-charcoal text-xl font-serif font-medium border-b border-subtle-border pb-2">Family Details</h3>
         <div className="flex flex-col gap-2">
           <label className="text-sm font-bold text-slate-grey ml-2">Siblings</label>
-          <input 
+          <input
             className="w-full bg-white border border-subtle-border rounded-full px-5 py-3 text-charcoal placeholder-slate-grey/30 focus:border-rajkumari focus:ring-1 focus:ring-rajkumari transition-all shadow-sm"
             placeholder="e.g., 1 Elder Brother (Married), 1 Younger Sister"
             type="text"
@@ -603,7 +663,7 @@ const ProfileCreation = () => {
           <div className="flex flex-col gap-2">
             <label className="text-sm font-bold text-slate-grey ml-2">Family Type</label>
             <div className="relative">
-              <select 
+              <select
                 className="w-full appearance-none bg-white border border-subtle-border rounded-full px-5 py-3 text-charcoal focus:border-rajkumari focus:ring-1 focus:ring-rajkumari transition-all pr-10 shadow-sm cursor-pointer"
                 value={formData.familyType}
                 onChange={(e) => handleInputChange('familyType', e.target.value)}
@@ -619,7 +679,7 @@ const ProfileCreation = () => {
           <div className="flex flex-col gap-2">
             <label className="text-sm font-bold text-slate-grey ml-2">Family Values</label>
             <div className="relative">
-              <select 
+              <select
                 className="w-full appearance-none bg-white border border-subtle-border rounded-full px-5 py-3 text-charcoal focus:border-rajkumari focus:ring-1 focus:ring-rajkumari transition-all pr-10 shadow-sm cursor-pointer"
                 value={formData.familyValues}
                 onChange={(e) => handleInputChange('familyValues', e.target.value)}
@@ -635,7 +695,7 @@ const ProfileCreation = () => {
         </div>
         <div className="flex flex-col gap-2">
           <label className="text-sm font-bold text-slate-grey ml-2">Family Location</label>
-          <input 
+          <input
             className="w-full bg-white border border-subtle-border rounded-full px-5 py-3 text-charcoal placeholder-slate-grey/30 focus:border-rajkumari focus:ring-1 focus:ring-rajkumari transition-all shadow-sm"
             placeholder="e.g., Mumbai, Maharashtra"
             type="text"
@@ -663,7 +723,7 @@ const ProfileCreation = () => {
           <div className="flex flex-col gap-2">
             <label className="text-sm font-bold text-slate-grey ml-2">Diet Preference</label>
             <div className="relative">
-              <select 
+              <select
                 className="w-full appearance-none bg-white border border-subtle-border rounded-full px-5 py-3 text-charcoal focus:border-rajkumari focus:ring-1 focus:ring-rajkumari transition-all pr-10 shadow-sm cursor-pointer"
                 value={formData.dietPreference}
                 onChange={(e) => handleInputChange('dietPreference', e.target.value)}
@@ -681,7 +741,7 @@ const ProfileCreation = () => {
           <div className="flex flex-col gap-2">
             <label className="text-sm font-bold text-slate-grey ml-2">Drinking</label>
             <div className="relative">
-              <select 
+              <select
                 className="w-full appearance-none bg-white border border-subtle-border rounded-full px-5 py-3 text-charcoal focus:border-rajkumari focus:ring-1 focus:ring-rajkumari transition-all pr-10 shadow-sm cursor-pointer"
                 value={formData.drinkingHabit}
                 onChange={(e) => handleInputChange('drinkingHabit', e.target.value)}
@@ -698,7 +758,7 @@ const ProfileCreation = () => {
           <div className="flex flex-col gap-2">
             <label className="text-sm font-bold text-slate-grey ml-2">Smoking</label>
             <div className="relative">
-              <select 
+              <select
                 className="w-full appearance-none bg-white border border-subtle-border rounded-full px-5 py-3 text-charcoal focus:border-rajkumari focus:ring-1 focus:ring-rajkumari transition-all pr-10 shadow-sm cursor-pointer"
                 value={formData.smokingHabit}
                 onChange={(e) => handleInputChange('smokingHabit', e.target.value)}
@@ -722,9 +782,9 @@ const ProfileCreation = () => {
           <div className="flex flex-wrap gap-3 mt-2">
             {['Nuclear Family', 'Joint Family', 'Open to Both', 'Depends on Circumstances'].map((arrangement) => (
               <label key={arrangement} className="cursor-pointer">
-                <input 
-                  type="radio" 
-                  name="living_arrangement" 
+                <input
+                  type="radio"
+                  name="living_arrangement"
                   className="peer sr-only"
                   checked={formData.livingArrangement === arrangement}
                   onChange={() => handleInputChange('livingArrangement', arrangement)}
@@ -744,8 +804,8 @@ const ProfileCreation = () => {
         <div className="flex flex-wrap gap-2">
           {['Reading', 'Travel', 'Music', 'Movies', 'Sports', 'Cooking', 'Photography', 'Art', 'Yoga', 'Fitness', 'Gaming', 'Hiking', 'Dancing', 'Writing'].map((hobby) => (
             <label key={hobby} className="cursor-pointer">
-              <input 
-                type="checkbox" 
+              <input
+                type="checkbox"
                 className="peer sr-only"
                 checked={formData.hobbies.includes(hobby)}
                 onChange={(e) => {
@@ -766,6 +826,34 @@ const ProfileCreation = () => {
     </div>
   );
 
+  const handleImageUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setUploading(true);
+    try {
+      const res = await uploadProfileImage(file);
+      // Backend returns { message, filePath }
+      if (res.filePath) {
+        const fullPath = `http://localhost:5000/uploads/${res.filePath}`;
+        // Update local photos list
+        setFormData(prev => ({
+          ...prev,
+          photos: [...prev.photos, fullPath]
+        }));
+        // Update global user context for Header
+        if (user) {
+          setUser({ ...user, profilePicture: res.filePath });
+        }
+      }
+    } catch (err) {
+      console.error("Upload failed", err);
+      alert("Failed to upload image. Please try again.");
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const renderVisualPortfolio = () => (
     <div className="space-y-10">
       <div className="bg-stone-50 border border-stone-200 rounded-xl p-6 text-center">
@@ -774,22 +862,49 @@ const ProfileCreation = () => {
         <p className="text-sm text-slate-grey mb-6 max-w-md mx-auto">
           Add 3-6 photos that showcase your personality. Clear face photos work best for making a great first impression.
         </p>
-        <button className="bg-rajkumari text-white hover:bg-rajkumari/90 px-6 py-3 rounded-full text-sm font-semibold transition-all">
-          <span className="flex items-center gap-2">
+        <input
+          type="file"
+          id="profile-upload"
+          className="hidden"
+          accept="image/*"
+          onChange={handleImageUpload}
+          disabled={uploading}
+        />
+        <label
+          htmlFor="profile-upload"
+          className={`bg-rajkumari text-white hover:bg-rajkumari/90 px-6 py-3 rounded-full text-sm font-semibold transition-all inline-flex items-center gap-2 cursor-pointer ${uploading ? 'opacity-50 cursor-not-allowed' : ''}`}
+        >
+          {uploading ? (
+            <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+          ) : (
             <span className="material-symbols-outlined text-lg">upload</span>
-            Choose Photos
-          </span>
-        </button>
+          )}
+          {uploading ? 'Uploading...' : 'Choose Photos'}
+        </label>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-        {[1, 2, 3, 4, 5, 6].map((i) => (
-          <div 
-            key={i} 
+        {formData.photos.map((photo, index) => (
+          <div key={index} className="aspect-square rounded-xl border border-stone-200 bg-stone-50 overflow-hidden relative group">
+            <img src={photo} alt={`Profile ${index}`} className="w-full h-full object-cover" />
+            <button
+              type="button"
+              onClick={() => setFormData(prev => ({ ...prev, photos: prev.photos.filter((_, i) => i !== index) }))}
+              className="absolute top-2 right-2 bg-black/50 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+            >
+              <span className="material-symbols-outlined text-base">close</span>
+            </button>
+          </div>
+        ))}
+        {/* Placeholders for remaining slots */}
+        {[...Array(Math.max(0, 6 - formData.photos.length))].map((_, i) => (
+          <label
+            key={`placeholder-${i}`}
+            htmlFor="profile-upload"
             className="aspect-square rounded-xl border-2 border-dashed border-stone-200 bg-stone-50 flex items-center justify-center hover:border-rajkumari/50 hover:bg-rajkumari/5 transition-all cursor-pointer group"
           >
             <span className="material-symbols-outlined text-3xl text-stone-300 group-hover:text-rajkumari/50">add</span>
-          </div>
+          </label>
         ))}
       </div>
 
@@ -830,20 +945,88 @@ const ProfileCreation = () => {
     }
   };
 
+  // Transform flat formData to nested backend schema
+  const getPayload = () => {
+    return {
+      gender: formData.gender,
+      personalDetails: {
+        dob: formData.dateOfBirth,
+        height: formData.height,
+        maritalStatus: formData.maritalStatus,
+        religion: formData.religion,
+        community: formData.community,
+        caste: formData.caste,
+        motherTongue: formData.motherTongue,
+        about: formData.aboutText,
+        // jathagam is handled separately via upload currently, or needs logic
+      },
+      careerDetails: {
+        education: formData.highestEducation,
+        fieldOfStudy: formData.fieldOfStudy,
+        institution: formData.institution,
+        profession: formData.currentProfession,
+        employer: formData.employer,
+        income: formData.annualIncome,
+        workLocation: formData.workLocation,
+      },
+      familyDetails: {
+        fatherName: formData.fatherName,
+        fatherOccupation: formData.fatherOccupation,
+        motherName: formData.motherName,
+        motherOccupation: formData.motherOccupation,
+        siblings: formData.siblings,
+        familyType: formData.familyType,
+        familyValues: formData.familyValues,
+        familyLocation: formData.familyLocation,
+      },
+      lifestyleDetails: {
+        diet: formData.dietPreference,
+        drinking: formData.drinkingHabit,
+        smoking: formData.smokingHabit,
+        hobbies: formData.hobbies,
+        livingArrangement: formData.livingArrangement,
+      },
+      preferences: {
+        relocate: formData.relocate,
+      },
+      profileImages: formData.photos, // Array of URLs
+      fullName: `${formData.firstName} ${formData.lastName}`.trim(),
+    };
+  };
+
+  const handleSave = async (isDraft = false) => {
+    try {
+      setUploading(true);
+      const payload = getPayload();
+      const res = await import('../services/api').then(mod => mod.updateProfileInfo(payload)); // dynamic import to avoid circular dep if any, or just import at top
+
+      if (res.success) {
+        if (!isDraft) {
+          const currentIndex = sections.findIndex(s => s.id === activeSection);
+          if (currentIndex < sections.length - 1) {
+            setActiveSection(sections[currentIndex + 1].id);
+          } else {
+            // Final submit
+            navigate('/profile');
+          }
+        } else {
+          navigate('/profile');
+        }
+      } else {
+        alert("Failed to save: " + res.message);
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Error saving profile");
+    } finally {
+      setUploading(false);
+    }
+  };
+
   return (
     <div className="bg-ivory text-charcoal font-sans overflow-hidden h-screen flex flex-col antialiased">
       {/* Header */}
-      <header className="flex-none flex items-center justify-between whitespace-nowrap border-b border-subtle-border bg-ivory/80 backdrop-blur-md px-10 py-4 z-20">
-        <Link to="/" className="flex items-center">
-          <Logo size="md" />
-        </Link>
-        <div className="flex flex-1 justify-end gap-8 items-center">
-          <div className="flex items-center gap-9 hidden md:flex">
-            <Link to="/help" className="text-slate-grey hover:text-rajkumari transition-colors text-sm font-medium">Help</Link>
-            <Link to="/dashboard" className="text-slate-grey hover:text-rajkumari transition-colors text-sm font-medium">Dashboard</Link>
-          </div>
-        </div>
-      </header>
+      <Header />
 
       <div className="flex flex-1 h-full overflow-hidden">
         {/* Sidebar */}
@@ -868,19 +1051,16 @@ const ProfileCreation = () => {
                 <button
                   key={section.id}
                   onClick={() => setActiveSection(section.id)}
-                  className={`flex items-center gap-3 px-4 py-3 rounded-full transition-all group text-left w-full ${
-                    activeSection === section.id
-                      ? 'bg-white border border-rajkumari/20 shadow-soft'
-                      : 'hover:bg-white/60 opacity-70 hover:opacity-100'
-                  }`}
+                  className={`flex items-center gap-3 px-4 py-3 rounded-full transition-all group text-left w-full ${activeSection === section.id
+                    ? 'bg-white border border-rajkumari/20 shadow-soft'
+                    : 'hover:bg-white/60 opacity-70 hover:opacity-100'
+                    }`}
                 >
-                  <span className={`material-symbols-outlined text-[20px] ${
-                    activeSection === section.id ? 'text-rajkumari' : 'text-slate-grey group-hover:text-rajkumari'
-                  }`}>{section.icon}</span>
+                  <span className={`material-symbols-outlined text-[20px] ${activeSection === section.id ? 'text-rajkumari' : 'text-slate-grey group-hover:text-rajkumari'
+                    }`}>{section.icon}</span>
                   <div className="flex flex-col">
-                    <span className={`text-sm ${
-                      activeSection === section.id ? 'font-semibold text-charcoal' : 'font-medium text-slate-grey group-hover:text-charcoal'
-                    }`}>{section.label}</span>
+                    <span className={`text-sm ${activeSection === section.id ? 'font-semibold text-charcoal' : 'font-medium text-slate-grey group-hover:text-charcoal'
+                      }`}>{section.label}</span>
                     {section.id === 'personal' && activeSection === 'personal' && (
                       <span className="text-ghee text-[10px] font-bold uppercase tracking-wide">In Progress</span>
                     )}
@@ -906,7 +1086,7 @@ const ProfileCreation = () => {
                 {getSectionTitle().step}
               </div>
               <h1 className="text-charcoal text-4xl lg:text-5xl font-serif font-medium leading-tight tracking-tight mb-4">
-                {getSectionTitle().title.split(' ').map((word, i, arr) => 
+                {getSectionTitle().title.split(' ').map((word, i, arr) =>
                   i === arr.length - 1 ? (
                     <span key={i} className="relative inline-block z-10">{word}<span className="absolute bottom-1 left-0 w-full h-3 bg-ghee/30 -z-10 rounded-full"></span></span>
                   ) : word + ' '
@@ -917,19 +1097,22 @@ const ProfileCreation = () => {
               </p>
             </div>
 
-            <form className="flex flex-col gap-10">
+            <form className="flex flex-col gap-10" onSubmit={(e) => e.preventDefault()}>
               {renderActiveSection()}
             </form>
           </div>
 
           {/* Fixed Bottom Actions */}
           <div className="fixed bottom-0 left-0 lg:left-80 right-0 bg-ivory/90 backdrop-blur-md border-t border-subtle-border p-6 flex justify-between items-center z-10 shadow-[0_-5px_20px_rgba(0,0,0,0.02)]">
-            <button className="text-slate-grey hover:text-charcoal text-sm font-medium px-4 py-2 rounded-full hover:bg-stone-100 transition-colors">
+            <button
+              onClick={() => handleSave(true)}
+              className="text-slate-grey hover:text-charcoal text-sm font-medium px-4 py-2 rounded-full hover:bg-stone-100 transition-colors"
+            >
               Save Draft
             </button>
             <div className="flex items-center gap-3">
               {activeSection !== 'personal' && (
-                <button 
+                <button
                   onClick={() => {
                     const currentIndex = sections.findIndex(s => s.id === activeSection);
                     if (currentIndex > 0) setActiveSection(sections[currentIndex - 1].id);
@@ -940,14 +1123,10 @@ const ProfileCreation = () => {
                   Previous
                 </button>
               )}
-              <button 
-                onClick={() => {
-                  const currentIndex = sections.findIndex(s => s.id === activeSection);
-                  if (currentIndex < sections.length - 1) {
-                    setActiveSection(sections[currentIndex + 1].id);
-                  }
-                }}
-                className="bg-rajkumari text-white hover:bg-[#B01E50] px-8 py-3 rounded-full text-sm font-bold tracking-wide transition-all transform hover:scale-105 shadow-[0_4px_14px_rgba(209,46,104,0.4)] flex items-center gap-2"
+              <button
+                onClick={() => handleSave(false)}
+                disabled={uploading}
+                className="bg-rajkumari text-white hover:bg-[#B01E50] px-8 py-3 rounded-full text-sm font-bold tracking-wide transition-all transform hover:scale-105 shadow-[0_4px_14px_rgba(209,46,104,0.4)] flex items-center gap-2 disabled:opacity-70"
               >
                 {activeSection === 'portfolio' ? 'Submit Profile' : 'Continue'}
                 <span className="material-symbols-outlined text-[18px]">arrow_forward</span>

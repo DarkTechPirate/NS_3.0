@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import Logo from '../components/Logo';
+import Header from '../components/Header';
+
 import Footer from '../components/Footer';
 
 const MemberDashboard = () => {
@@ -86,25 +88,7 @@ const MemberDashboard = () => {
   return (
     <div className="bg-[#FDFBF9] text-[#1a1a1a] font-display min-h-screen flex flex-col antialiased">
       {/* Header */}
-      <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-stone-100">
-        <div className="px-6 md:px-12 lg:px-20 mx-auto max-w-6xl h-16 flex items-center justify-between">
-          <Link to="/">
-            <Logo size="sm" />
-          </Link>
-          <nav className="hidden md:flex items-center gap-10">
-            <Link to="/dashboard" className="text-[#1a1a1a] text-sm font-semibold">My Matches</Link>
-            <Link to="/family-view" className="text-stone-400 text-sm font-medium hover:text-stone-600 transition-colors">Family View</Link>
-            <Link to="/messages" className="text-stone-400 text-sm font-medium hover:text-stone-600 transition-colors">Messages</Link>
-            <Link to="/create-profile" className="text-stone-400 text-sm font-medium hover:text-stone-600 transition-colors">Profile</Link>
-          </nav>
-          <div className="flex items-center gap-4">
-            <div 
-              className="size-10 rounded-full bg-stone-200 bg-cover bg-center border-2 border-white shadow-sm"
-              style={{ backgroundImage: "url('https://lh3.googleusercontent.com/aida-public/AB6AXuD__-DD2CtOEJUgPG4WAHBPKWSmZLS3b0IGYVyAQ5OXGFMQA1C0z5McOmIy5OgdS3CmgyVp7pH9MBmGmwhA_A-4187fUaLY5caOy8Aa_vYAIiwp5_8xBKYat5FG0B6LLyURSU_nDQaTCD508N9jUcX8JimS4u4BBgf19wfYmGapvgHM19-QQcrJmpwBn4kF6XBauxYarkg4OhYcKA3WBqNTjEWkVf1N2zHrurNqujT675gbM_Nens5MzJelBsjul1yU545gexWerj8R')" }}
-            ></div>
-          </div>
-        </div>
-      </header>
+      <Header />
 
       <main className="flex-grow px-6 md:px-12 lg:px-20 py-10 mx-auto w-full max-w-6xl">
         {/* Header Section */}
@@ -118,7 +102,7 @@ const MemberDashboard = () => {
           <p className="text-stone-500 text-base max-w-xl">
             Your personal concierge has curated these introductions based on your values and preferences.
           </p>
-          
+
           {/* Subtle Status Indicators */}
           <div className="flex items-center gap-6 mt-6">
             <div className="flex items-center gap-2 text-sm text-stone-400">
@@ -135,14 +119,14 @@ const MemberDashboard = () => {
         {/* Match Cards */}
         <div className="flex flex-col gap-10">
           {visibleMatches.map((match) => (
-            <article 
-              key={match.id} 
+            <article
+              key={match.id}
               className="bg-white rounded-2xl overflow-hidden shadow-sm border border-stone-100"
             >
               <div className="flex flex-col lg:flex-row">
                 {/* Photo Section */}
                 <div className="relative w-full lg:w-[320px] shrink-0">
-                  <div 
+                  <div
                     className="aspect-[4/5] lg:aspect-auto lg:h-full w-full bg-stone-100 bg-cover bg-center"
                     style={{ backgroundImage: `url('${match.image}')` }}
                   ></div>
@@ -170,7 +154,7 @@ const MemberDashboard = () => {
                         {match.timeline}
                       </div>
                     </div>
-                    
+
                     <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-stone-500 mt-3">
                       {match.height && <span>{match.height}</span>}
                       <span className="w-1 h-1 rounded-full bg-stone-300"></span>
@@ -183,8 +167,8 @@ const MemberDashboard = () => {
                   {/* Alignment Tags */}
                   <div className="flex flex-wrap gap-2 mb-8">
                     {match.tags.map((tag, index) => (
-                      <span 
-                        key={index} 
+                      <span
+                        key={index}
                         className="px-3 py-1.5 bg-stone-50 rounded-full text-sm text-stone-600 border border-stone-100"
                       >
                         {tag}
@@ -214,17 +198,17 @@ const MemberDashboard = () => {
                       <span className="material-symbols-outlined text-lg">favorite</span>
                       Express Interest
                     </button>
-                    
+
                     {/* Secondary CTA */}
-                    <Link 
-                      to="/match-detail" 
+                    <Link
+                      to="/match-detail"
                       className="flex-1 lg:flex-none h-12 px-6 border border-stone-200 hover:border-stone-300 hover:bg-stone-50 text-stone-700 rounded-full font-medium text-sm transition-all flex items-center justify-center"
                     >
                       View Full Profile
                     </Link>
-                    
+
                     {/* Tertiary Action - Decline */}
-                    <button 
+                    <button
                       onClick={() => handleDecline(match.id)}
                       className="size-12 rounded-full border border-stone-200 hover:border-stone-300 hover:bg-stone-50 flex items-center justify-center text-stone-400 hover:text-stone-500 transition-all ml-auto lg:ml-0"
                       title="Pass"

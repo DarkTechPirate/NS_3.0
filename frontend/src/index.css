@@ -1,0 +1,21 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-display: 'Spline Sans', sans-serif;
+  --font-body: 'Manrope', sans-serif;
+  --font-serif: 'Playfair Display', serif;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-body);
+  background-color: #fdfbf7; /* background-ivory */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+code {
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New', monospace;
+}
