@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import Logo from '../components/Logo';
+import Header from '../components/Header';
 import Footer from '../components/Footer';
 
 const WelcomeBrandScreen = () => {
@@ -8,22 +9,7 @@ const WelcomeBrandScreen = () => {
     <div className="font-display bg-background-light text-text-charcoal antialiased selection:bg-rajkumari-pink selection:text-white">
       <div className="relative flex min-h-screen w-full flex-col overflow-x-hidden">
         {/* Navigation */}
-        <nav className="fixed top-0 left-0 right-0 z-50 transition-all duration-300 backdrop-blur-md border-b border-luxury-border/50 bg-background-light/80">
-          <div className="mx-auto max-w-7xl px-6 lg:px-8">
-            <div className="flex h-20 items-center justify-between">
-              <Link to="/" className="flex items-center">
-                <Logo size="md" />
-              </Link>
-              <div className="flex items-center gap-6 md:gap-8">
-                <Link to="/dashboard" className="text-sm font-medium hover:text-rajkumari-pink transition-colors text-text-muted">Login</Link>
-                <Link to="/onboarding" className="hidden md:flex flex-col items-center justify-center bg-rajkumari-pink hover:bg-rajkumari-pink/90 text-white px-6 py-1.5 rounded-full transition-all transform hover:scale-105 shadow-soft group">
-                  <span className="text-sm font-semibold tracking-wide">Apply for Membership</span>
-                  <span className="text-[10px] font-medium tracking-wider uppercase text-white/80 group-hover:text-white">Reviewed applications only</span>
-                </Link>
-              </div>
-            </div>
-          </div>
-        </nav>
+        <Header />
 
         <main className="flex-grow flex flex-col">
           {/* Hero Section */}
@@ -65,9 +51,9 @@ const WelcomeBrandScreen = () => {
               <div className="aspect-[21/9] rounded-[2.5rem] overflow-hidden relative shadow-2xl shadow-rajkumari-pink/10 border border-white/50 ring-1 ring-black/5 group">
                 <div className="absolute inset-0 bg-black/10 z-10 pointer-events-none"></div>
                 <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent z-10"></div>
-                <img 
-                  alt="Elegant couple holding hands in dim lighting showing connection" 
-                  className="w-full h-full object-cover transform transition-transform duration-700 group-hover:scale-105 saturate-[0.8]" 
+                <img
+                  alt="Elegant couple holding hands in dim lighting showing connection"
+                  className="w-full h-full object-cover transform transition-transform duration-700 group-hover:scale-105 saturate-[0.8]"
                   src="https://lh3.googleusercontent.com/aida-public/AB6AXuBefJDzWwlYbKrXDFkSjL7JVNLbTBaI9DyC722DVi-WwqqLsE8WP3A3lZqepF_YfdnyVhlLrvifgedLnr59iyERR6UYarbqWXV3PQ6bhoD576xhZ1UXLmky__YmJWK4Fi5H0bLxWlHBLdf_NBRwzbPN_-4cmZ29oW8ez7ddnfAwYyKiC7MJbO5tPBkyCOA1SQ3cPI8YSPx8ea28fCs9S4GXNJ2zXQd09lSuqfleGvVY1ftCvBJdbQvlmwxntRIYxxDYS43u7aXY_b_j"
                 />
                 <div className="absolute bottom-8 left-8 right-8 z-20 flex justify-between items-end">
@@ -104,7 +90,7 @@ const WelcomeBrandScreen = () => {
                   </div>
                 </div>
               </div>
-              
+
               <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                 <div className="group p-8 rounded-3xl bg-background-light border border-luxury-border hover:border-rajkumari-pink/30 transition-all duration-300 hover:shadow-soft hover:-translate-y-1">
                   <div className="w-14 h-14 rounded-2xl bg-rajkumari-light/20 flex items-center justify-center mb-6 group-hover:bg-rajkumari-pink/10 transition-colors">
