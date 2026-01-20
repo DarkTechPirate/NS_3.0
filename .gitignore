@@ -3,11 +3,11 @@ node_modules/
 */node_modules/
 package-lock.json
 */package-lock.json
-
+Instructions.txt
 # Production build
 build/
 dist/
-
+example/*
 # Environment variables
 .env
 .env.local
