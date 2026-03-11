@@ -4,9 +4,14 @@ const { connection } = require("../services/queue");
 const sharp = require("sharp");
 const path = require("path");
 const fs = require("fs");
-const minio = require("../config/minio");
 
 sharp.cache(false);
+
+const USE_MINIO = process.env.USE_MINIO === "true";
+let minio;
+if (USE_MINIO) {
+  minio = require("../config/minio");
+}
 
 // Models
 require("../models/userModel");
@@ -61,25 +66,38 @@ const worker = new Worker(
                 throw new Error("Sharp output invalid");
             }
 
-            // ---------- STEP 4: Upload to MinIO ----------
+            // ---------- STEP 4: Upload to MinIO (or keep local) ----------
             const objectKey = `${modelName.toLowerCase()}/${finalFilename}`;
-            console.log(`[Worker][STEP 4] Uploading to MinIO`);
-            console.log(`[Worker][STEP 4] Object Key: ${objectKey}`);
+            let storedPath;
 
-            // Ensure bucket exists
-            const bucketExists = await minio.bucketExists(BUCKET);
-            if (!bucketExists) {
-                await minio.makeBucket(BUCKET, 'us-east-1'); // Default region
+            if (USE_MINIO && minio) {
+                console.log(`[Worker][STEP 4] Uploading to MinIO`);
+                console.log(`[Worker][STEP 4] Object Key: ${objectKey}`);
+
+                // Ensure bucket exists
+                const bucketExists = await minio.bucketExists(BUCKET);
+                if (!bucketExists) {
+                    await minio.makeBucket(BUCKET, 'us-east-1'); // Default region
+                }
+
+                await minio.fPutObject(BUCKET, objectKey, tempOutput, {
+                    "Content-Type": "image/webp",
+                });
+
+                console.log(`[Worker][STEP 4] MinIO upload DONE`);
+                storedPath = `/uploads/${objectKey}`;
+            } else {
+                // Local fallback: move file to public/uploads
+                const localDir = path.join(__dirname, `../public/uploads/${modelName.toLowerCase()}`);
+                if (!fs.existsSync(localDir)) fs.mkdirSync(localDir, { recursive: true });
+                const localDest = path.join(localDir, finalFilename);
+                fs.copyFileSync(tempOutput, localDest);
+                fs.unlinkSync(tempOutput);
+                console.log(`[Worker][STEP 4] File saved locally at ${localDest}`);
+                storedPath = `/uploads/${objectKey}`;
             }
 
-            await minio.fPutObject(BUCKET, objectKey, tempOutput, {
-                "Content-Type": "image/webp",
-            });
-
-            console.log(`[Worker][STEP 4] MinIO upload DONE`);
-
             // ---------- STEP 5: DB update ----------
-            const storedPath = `/uploads/${objectKey}`;
             console.log(`[Worker][STEP 5] Stored path: ${storedPath}`);
 
             const Model = mongoose.model(modelName);
@@ -98,15 +116,24 @@ const worker = new Worker(
                     const oldPath = doc[fieldName];
                     if (oldPath && oldPath.startsWith("/uploads/")) {
                         // Extract key from /uploads/user/file.webp -> user/file.webp
-                        // Assuming route is /uploads/ -> map to bucket content
                         const oldKey = oldPath.replace(/^\/uploads\//, "");
-                        try {
-                            console.log(
-                                `[Worker][STEP 5] Deleting old MinIO object: ${oldKey}`
-                            );
-                            await minio.removeObject(BUCKET, oldKey);
-                        } catch (e) {
-                            console.warn(`[Worker] Old object delete failed (ignored): ${e}`);
+                        if (USE_MINIO && minio) {
+                            try {
+                                console.log(
+                                    `[Worker][STEP 5] Deleting old MinIO object: ${oldKey}`
+                                );
+                                await minio.removeObject(BUCKET, oldKey);
+                            } catch (e) {
+                                console.warn(`[Worker] Old object delete failed (ignored): ${e}`);
+                            }
+                        } else {
+                            // Local fallback: delete old local file
+                            const localOldPath = path.join(__dirname, `../public${oldPath}`);
+                            try {
+                                if (fs.existsSync(localOldPath)) fs.unlinkSync(localOldPath);
+                            } catch (e) {
+                                console.warn(`[Worker] Old local file delete failed (ignored): ${e}`);
+                            }
                         }
                     }
                 }
@@ -117,8 +144,8 @@ const worker = new Worker(
 
             // ---------- STEP 6: Cleanup ----------
             console.log(`[Worker][STEP 6] Cleanup start`);
-            fs.unlinkSync(tempOutput);
-            fs.unlinkSync(absoluteInputPath);
+            if (fs.existsSync(tempOutput)) fs.unlinkSync(tempOutput);
+            if (fs.existsSync(absoluteInputPath)) fs.unlinkSync(absoluteInputPath);
 
             console.log(`[Worker] 🎉 JOB COMPLETED SUCCESSFULLY`);
             console.log(`[Worker] Final Path: ${storedPath}\n`);

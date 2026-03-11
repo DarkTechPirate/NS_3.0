@@ -110,11 +110,10 @@ app.get('/', (req, res) => {
 (async () => {
   try {
     await connectMongo();
-    app.listen(PORT, () => {
-      console.log(`Server is running on port ${PORT}`);
-    });
   } catch (err) {
-    console.error("Startup failed:", err);
-    process.exit(1);
+    console.warn("⚠️  MongoDB unavailable – running in limited mode (DB-dependent routes will return 503):", err.message);
   }
+  app.listen(PORT, () => {
+    console.log(`Server is running on port ${PORT}`);
+  });
 })();
