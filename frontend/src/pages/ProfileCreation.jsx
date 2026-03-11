@@ -826,6 +826,13 @@ const ProfileCreation = () => {
     </div>
   );
 
+  // Helper to resolve image URL
+  const getImageUrl = (path) => {
+    if (!path) return '';
+    if (path.startsWith('http') || path.startsWith('blob:')) return path;
+    return `http://localhost:5000/uploads/${path}`;
+  };
+
   const handleImageUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -833,13 +840,12 @@ const ProfileCreation = () => {
     setUploading(true);
     try {
       const res = await uploadProfileImage(file);
-      // Backend returns { message, filePath }
+      // Backend returns { message, filePath } (e.g. user/filename.webp)
       if (res.filePath) {
-        const fullPath = `http://localhost:5000/uploads/${res.filePath}`;
-        // Update local photos list
+        // Store RELATIVE path in state/DB to keep data clean
         setFormData(prev => ({
           ...prev,
-          photos: [...prev.photos, fullPath]
+          photos: [...prev.photos, res.filePath]
         }));
         // Update global user context for Header
         if (user) {
@@ -886,7 +892,7 @@ const ProfileCreation = () => {
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
         {formData.photos.map((photo, index) => (
           <div key={index} className="aspect-square rounded-xl border border-stone-200 bg-stone-50 overflow-hidden relative group">
-            <img src={photo} alt={`Profile ${index}`} className="w-full h-full object-cover" />
+            <img src={getImageUrl(photo)} alt={`Profile ${index}`} className="w-full h-full object-cover" />
             <button
               type="button"
               onClick={() => setFormData(prev => ({ ...prev, photos: prev.photos.filter((_, i) => i !== index) }))}
