@@ -1,69 +1,30 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import Logo from '../components/Logo';
 import Header from '../components/Header';
-
 import Footer from '../components/Footer';
+import { useAuth } from '../context/AuthContext';
+import axios from 'axios';
 
 const MemberDashboard = () => {
+  const { user } = useAuth();
   const [declinedMatches, setDeclinedMatches] = useState([]);
+  const [matches, setMatches] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const matches = [
-    {
-      id: 1,
-      name: "Rohan",
-      age: 29,
-      location: "Mumbai",
-      height: "5'11\"",
-      education: "MBA, Wharton School",
-      profession: "Product Director",
-      timeline: "Within 6–12 months",
-      isVerified: true,
-      image: "https://lh3.googleusercontent.com/aida-public/AB6AXuC89ut01yTgADvam3KjU8fg9T2nnF7-2SQtSBP-NAgbDSfGfnT56aJNeJLa9im3uGvEGDNOkpD9HA93bKXHj6JbPsYTMZWyndHs94HEjAa8aOTiGhOeg57fWTxv3b-fYjbhQ7e7ga7lyBhp4sn-6ZG6z6AexaIK_VGqAU3vG5ttMZWMKA9fy5Jcb1LURPDWEuLfxRHekXnJvRSMUkEctO5D0zoEUwt_cXMIVlJJAQLX5N1J1qPUikIi7Qo0IkHFhiOK73cCmm58s9Cx",
-      tags: ["Vegetarian", "Values Family", "Hindi & English", "Non-Smoker"],
-      whyThisMatch: [
-        "Rohan shares your interest in sustainable living and mindful consumption.",
-        "Both of you value a nuclear family setup while staying close to extended family.",
-        "Similar professional ambitions with emphasis on work-life balance."
-      ]
-    },
-    {
-      id: 2,
-      name: "Arjun",
-      age: 31,
-      location: "Bangalore",
-      height: "6'0\"",
-      education: "MS, Stanford University",
-      profession: "Senior Architect",
-      timeline: "Within 1 year",
-      isVerified: true,
-      image: "https://lh3.googleusercontent.com/aida-public/AB6AXuDesdToYoelRVZ59vCAJX-pBYamIhetumhG6CvQutaPYdFpcPmfwKcA4jqIRt9hO4RtJjHeJabTnNhcBZKI59dfxUfnievvczhNEgb48diu0UVYioLVa9QBtr1IZynuEbO5hJ_KvN8ElE5x_cyC1p06oBGdkUeNlGvZRlHGFnuCNaoiqYDVnYkZb_B6G_BLnFBk_b0e0gEzcSXXaS3n5BPGyeZ5W_rAojip2fKvFp-Wr8kAyPFrPx9Mv9ujN9o90gSGISY4T1sMqlNn",
-      tags: ["Classical Music", "Outdoor Activities", "Non-Smoker", "Moderate Drinker"],
-      whyThisMatch: [
-        "Arjun enjoys outdoor activities and hiking, aligning with your interests.",
-        "Compatible career expectations with mutual respect for personal space.",
-        "Shared appreciation for art and cultural experiences."
-      ]
-    },
-    {
-      id: 3,
-      name: "Vikram",
-      age: 30,
-      location: "London, UK",
-      height: "5'10\"",
-      education: "PhD, Cambridge",
-      profession: "Research Economist",
-      timeline: "Within 6 months",
-      isVerified: true,
-      image: "https://lh3.googleusercontent.com/aida-public/AB6AXuDb69ocGE-dlZbZh3uhN5hCPhr51fhbqWaLiYq0gLz5rmJ7hdlsYruH2xgwoM3EYa73AnXbKSxSQ7E6SMGlt6wpsAv6R_mZGln5wN29yYTwMZA1m-gXYrrToKqv5nU9GpqbT_rbqgzk58b14MkH9YsTf-q2j2Blv3k-ZCOBpb6LEO8uD0sCUJMuxw4bTYl7KmGAqTRa2TAY2x1NkqoAGpauuyRb5u3jUazUzzSvMdyw-i0K0J1YopuVSCNRp-Qb5-Bcv0OxXzR0azcI",
-      tags: ["Book Lover", "Eggetarian", "Open to Relocation", "Tamil & English"],
-      whyThisMatch: [
-        "Vikram comes from a family of academics, aligning with your educational values.",
-        "Open to relocating to India, matching your preference to settle domestically.",
-        "Shared love for literature and intellectual conversations."
-      ]
-    }
-  ];
+  useEffect(() => {
+    const fetchMatches = async () => {
+      try {
+        const response = await axios.get('http://localhost:5000/api/matches', { withCredentials: true });
+        setMatches(response.data);
+      } catch (error) {
+        console.error("Error fetching matches:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchMatches();
+  }, []);
 
   const visibleMatches = matches.filter(m => !declinedMatches.includes(m.id));
   const remainingCount = visibleMatches.length;
@@ -85,6 +46,14 @@ const MemberDashboard = () => {
     return now.toLocaleDateString('en-US', options);
   };
 
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#FDFBF9] flex items-center justify-center">
+        <div className="w-10 h-10 border-4 border-primary/30 border-t-primary rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+
   return (
     <div className="bg-[#FDFBF9] text-[#1a1a1a] font-display min-h-screen flex flex-col antialiased">
       {/* Header */}
@@ -94,10 +63,10 @@ const MemberDashboard = () => {
         {/* Header Section */}
         <div className="mb-12">
           <p className="text-xs font-medium tracking-widest uppercase text-stone-400 mb-2">
-            Weekly Selection – {getCurrentWeek()}
+            Weekly Selection — {getCurrentWeek()}
           </p>
           <h1 className="text-3xl md:text-4xl font-serif font-medium text-[#1a1a1a] mb-4">
-            {getGreeting()}, Sarah
+            {getGreeting()}, {user?.fullname?.split(' ')[0] || 'Member'}
           </h1>
           <p className="text-stone-500 text-base max-w-xl">
             Your personal concierge has curated these introductions based on your values and preferences.
@@ -128,10 +97,10 @@ const MemberDashboard = () => {
                 <div className="relative w-full lg:w-[320px] shrink-0">
                   <div
                     className="aspect-[4/5] lg:aspect-auto lg:h-full w-full bg-stone-100 bg-cover bg-center"
-                    style={{ backgroundImage: `url('${match.image}')` }}
+                    style={{ backgroundImage: `url('${match.image || match.profilePicture}')` }}
                   ></div>
                   {/* Verification Badge */}
-                  {match.isVerified && (
+                  {(match.isVerified || match.verified) && (
                     <div className="absolute top-4 left-4 bg-white/95 backdrop-blur-sm px-3 py-1.5 rounded-full text-xs font-medium text-[#1a1a1a] flex items-center gap-1.5 shadow-sm">
                       <span className="material-symbols-outlined text-sm text-blue-500" style={{ fontVariationSettings: "'FILL' 1" }}>verified</span>
                       Verified
@@ -166,7 +135,7 @@ const MemberDashboard = () => {
 
                   {/* Alignment Tags */}
                   <div className="flex flex-wrap gap-2 mb-8">
-                    {match.tags.map((tag, index) => (
+                    {match.tags?.map((tag, index) => (
                       <span
                         key={index}
                         className="px-3 py-1.5 bg-stone-50 rounded-full text-sm text-stone-600 border border-stone-100"
@@ -182,7 +151,7 @@ const MemberDashboard = () => {
                       Why This Match
                     </h3>
                     <ul className="space-y-3">
-                      {match.whyThisMatch.map((reason, index) => (
+                      {(match.whyThisMatch || match.matchReasons)?.map((reason, index) => (
                         <li key={index} className="flex items-start gap-3 text-sm text-stone-600 leading-relaxed">
                           <span className="w-1.5 h-1.5 rounded-full bg-primary mt-2 shrink-0"></span>
                           <span>{reason}</span>

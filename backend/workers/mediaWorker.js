@@ -34,10 +34,13 @@ const worker = new Worker(
         console.log(`[Worker] Model: ${modelName}`);
         console.log(`[Worker] File Path: ${filePath}`);
 
-        // ... Steps 1 & 2 ...
-
-        // Use the passed finalFilename
+        // ---------- STEP 1 & 2: Path Resolution ----------
+        const absoluteInputPath = path.resolve(filePath);
         const tempOutput = path.join(path.resolve(outputDir), finalFilename);
+
+        if (!fs.existsSync(absoluteInputPath)) {
+            throw new Error(`Input file not found: ${absoluteInputPath}`);
+        }
 
         try {
             // ---------- STEP 3: Sharp processing ----------

@@ -12,6 +12,7 @@ const connectMongo = require("./config/connectMongo");
 
 const authRoutes = require('./routes/authRoutes');
 const profileRoutes = require('./routes/profileRoutes');
+require('./workers/mediaWorker'); // Start the media worker
 
 const app = express();
 const PORT = process.env.PORT || 5000;
