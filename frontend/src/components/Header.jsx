@@ -26,10 +26,9 @@ const Header = ({ variant = 'default' }) => {
 
   const isActive = (path) => location.pathname === path;
 
-  // Image URL Logic
-  const BACKEND_URL = 'http://localhost:5000'; // Should ideally come from env
+  // Image URL Logic — use relative path so Vite proxy handles it
   const userImage = user?.profilePicture ?
-    (user.profilePicture.startsWith('http') ? user.profilePicture : `${BACKEND_URL}/uploads/${user.profilePicture}`)
+    (user.profilePicture.startsWith('http') ? user.profilePicture : `/uploads/${user.profilePicture}`)
     : null;
 
   return (

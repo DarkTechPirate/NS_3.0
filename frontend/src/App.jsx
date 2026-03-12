@@ -62,7 +62,7 @@ function App() {
               <FamilyViewMode />
             </ProtectedRoute>
           } />
-          <Route path="/match-detail" element={
+          <Route path="/match-detail/:id" element={
             <ProtectedRoute>
               <MatchDetailScreen />
             </ProtectedRoute>
