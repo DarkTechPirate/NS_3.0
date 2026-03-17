@@ -84,4 +84,66 @@ export const uploadProfileImage = async (file) => {
     }
 };
 
+// Match API Calls
+export const getMatches = async (filters = {}) => {
+    try {
+        const response = await api.get('/matches', { params: filters });
+        return response.data;
+    } catch (error) {
+        console.error('Fetch matches error:', error);
+        throw error.response?.data?.message || 'Failed to fetch matches';
+    }
+};
+
+export const expressInterest = async (matchId) => {
+    try {
+        const response = await api.post(`/matches/${matchId}/interest`);
+        return response.data;
+    } catch (error) {
+        console.error('Express interest error:', error);
+        throw error.response?.data?.message || 'Failed to express interest';
+    }
+};
+
+// Notification API Calls
+export const getNotifications = async () => {
+    try {
+        const response = await api.get('/notifications');
+        return response.data;
+    } catch (error) {
+        console.error('Fetch notifications error:', error);
+        throw error.response?.data?.message || 'Failed to fetch notifications';
+    }
+};
+
+export const markNotificationAsRead = async (id) => {
+    try {
+        const response = await api.patch(`/notifications/${id}/read`);
+        return response.data;
+    } catch (error) {
+        console.error('Mark notification error:', error);
+        throw error.response?.data?.message || 'Failed to update notification';
+    }
+};
+
+export const markAllNotificationsAsRead = async () => {
+    try {
+        const response = await api.patch('/notifications/read-all');
+        return response.data;
+    } catch (error) {
+        console.error('Mark all read error:', error);
+        throw error.response?.data?.message || 'Failed to update notifications';
+    }
+};
+
+export const getMatchDetail = async (userId) => {
+    try {
+        const response = await api.get(`/matches/detail/${userId}`);
+        return response.data;
+    } catch (error) {
+        console.error('Fetch match detail error:', error);
+        throw error.response?.data?.message || 'Failed to fetch match details';
+    }
+};
+
 export default api;

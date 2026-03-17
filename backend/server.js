@@ -12,6 +12,12 @@ const connectMongo = require("./config/connectMongo");
 
 const authRoutes = require('./routes/authRoutes');
 const profileRoutes = require('./routes/profileRoutes');
+const messagingRoutes = require('./routes/messagingRoutes');
+const matchRoutes = require('./routes/matchRoutes');
+const adminRoutes = require('./routes/adminRoutes');
+const notificationRoutes = require('./routes/notificationRoutes');
+const sseService = require('./services/sseService');
+const { protect } = require('./middleware/authMiddleware');
 require('./workers/mediaWorker'); // Start the media worker
 
 const app = express();
@@ -87,20 +93,79 @@ app.get(/^\/uploads\/(.+)$/, async (req, res, next) => {
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/profile', profileRoutes);
+app.use('/api/messaging', messagingRoutes);
+app.use('/api/matches', matchRoutes);
+app.use('/api/admin', adminRoutes);
+app.use('/api/notifications', notificationRoutes);
 
-// Sample data (Preserved)
-const matches = [
-  { id: 1, name: "Rohan", age: 29, location: "Mumbai, India", height: "5'11\"", education: "MBA, Wharton", profession: "Product Director", matchScore: 94, timeline: "Within 6 Months", verified: true, tags: ["Vegetarian", "Liberal Arts", "Startup Founder", "Hindi & English"], matchReasons: ["Rohan shares your strong interest in sustainable living and ethical consumption.", "Both of you value a nuclear family setup while maintaining close ties to extended relatives."] },
-  { id: 2, name: "Arjun", age: 31, location: "Bangalore, India", height: "6'0\"", education: "MS, Stanford", profession: "Architect", matchScore: 88, timeline: "Within 1 Year", verified: true, tags: ["Adventure Sports", "Classical Music", "Non-Smoker"], matchReasons: ["Arjun is looking for a partner who enjoys outdoor activities, matching your hiking hobby.", "Compatible professional ambitions with a shared focus on work-life balance."] },
-  { id: 3, name: "Vikram", age: 30, location: "London, UK", height: "5'10\"", education: "PhD, Cambridge", profession: "Economist", matchScore: 91, timeline: "Within 6 Months", verified: true, tags: ["Book Lover", "Eggetarian", "Joint Family"], matchReasons: ["Vikram comes from a family of academics, aligning with your educational background.", "Open to relocation to India, matching your preference to settle in Mumbai."] }
-];
+// SSE Endpoint for real-time updates (Keeping for backward compatibility for now)
+app.get('/api/events', protect(), (req, res) => {
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.flushHeaders();
 
-app.get('/api/matches', (req, res) => res.json(matches));
-app.get('/api/matches/:id', (req, res) => {
-  const match = matches.find(m => m.id === parseInt(req.params.id));
-  if (!match) return res.status(404).json({ message: 'Match not found' });
-  res.json(match);
+    const userId = req.user._id.toString();
+    sseService.addClient(userId, res);
+
+    // Send initial heartbeat
+    res.write('data: {"type":"CONNECTED"}\n\n');
+
+    // Keep connection alive with heartbeats every 30 seconds
+    const heartbeat = setInterval(() => {
+        res.write('data: {"type":"HEARTBEAT"}\n\n');
+    }, 30000);
+
+    req.on('close', () => {
+        clearInterval(heartbeat);
+    });
 });
+
+// Create HTTP server
+const http = require('http');
+const server = http.createServer(app);
+
+// Initialize Socket.io
+const { Server } = require('socket.io');
+const io = new Server(server, {
+  cors: {
+    origin: process.env.CLIENT_URL || 'http://localhost:5178',
+    credentials: true,
+  },
+});
+
+// Socket Authentication Middleware
+const cookie = require('cookie');
+const jwt = require('jsonwebtoken');
+const User = require('./models/userModel');
+
+io.use(async (socket, next) => {
+  try {
+    const cookies = cookie.parse(socket.handshake.headers.cookie || '');
+    const token = cookies.token;
+
+    if (!token) {
+      return next(new Error('Authentication error: No token provided'));
+    }
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const user = await User.findById(decoded.id).select('-password');
+
+    if (!user) {
+      return next(new Error('Authentication error: User not found'));
+    }
+
+    socket.user = user;
+    next();
+  } catch (err) {
+    console.error('Socket Auth Error:', err.message);
+    next(new Error('Authentication error: Invalid token'));
+  }
+});
+
+// Socket Events
+const socketService = require('./services/socketService');
+socketService.init(io);
 
 app.get('/', (req, res) => {
   res.json({ message: 'Welcome to Namma Sambandhi API', version: '1.0.0' });
@@ -110,7 +175,11 @@ app.get('/', (req, res) => {
 (async () => {
   try {
     await connectMongo();
-    app.listen(PORT, () => {
+
+    // Initialize Workers
+    require('./workers/matchWorker').initMatchWorker();
+
+    server.listen(PORT, () => {
       console.log(`Server is running on port ${PORT}`);
     });
   } catch (err) {
