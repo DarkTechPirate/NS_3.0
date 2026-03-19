@@ -26,6 +26,8 @@ const startWorkers = async () => {
 
         // 3. Import the worker ONLY after DB is connected
         require("./mediaWorker");
+        const { initMatchWorker } = require("./matchWorker");
+        initMatchWorker();
         // require("./orderWorker");
         // require("./notificationWorker");
 
