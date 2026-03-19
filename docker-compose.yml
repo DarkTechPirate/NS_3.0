@@ -4,11 +4,14 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     restart: unless-stopped
-    # I changed this to 5002 because your Ecommerce backend is already using port 5000!
+    # Use port 5002 as the host port to avoid conflicts with other services
     ports:
       - "5002:5000"
     networks:
       - infra_internal
+    # Automatically load all variables from the backend's .env file
+    env_file:
+      - ./backend/.env
     environment:
       PORT: 5000
       NODE_ENV: production
@@ -22,10 +25,12 @@ services:
       - "5178:5178"
     networks:
       - infra_internal
+    # Load frontend-specific variables if a .env file exists in the frontend directory
+    env_file:
+      - ./frontend/.env
     depends_on:
       - backend
 
-# This tells Docker to use your existing network instead of creating a new one
 networks:
   infra_internal:
     external: true
