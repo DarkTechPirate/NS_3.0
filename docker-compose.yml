@@ -1,29 +1,31 @@
-version: '3.8'
-
 services:
   backend:
     build:
       context: ./backend
-    container_name: ns_backend
-    restart: always
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    # I changed this to 5002 because your Ecommerce backend is already using port 5000!
     ports:
-      - "3002:5000" # Backend API
-      - "3003:5000" # Socket.io
-    env_file:
-      - ./backend/.env # <-- Tell Docker to load the env file directly into the container
+      - "5002:5000"
+    networks:
+      - infra_internal
     environment:
-      - PORT=5000
-      # You can remove all the ${VARIABLE} mappings here since env_file handles it
+      PORT: 5000
+      NODE_ENV: production
 
   frontend:
     build:
       context: ./frontend
-      args:
-        - VITE_API_URL=${VITE_API_URL:-http://localhost:3002/api}
-        - VITE_SOCKET_URL=${VITE_SOCKET_URL:-http://localhost:3003}
-    container_name: ns_frontend
-    restart: always
+      dockerfile: Dockerfile
+    restart: unless-stopped
     ports:
-      - "5001:80"
+      - "5178:5178"
+    networks:
+      - infra_internal
     depends_on:
       - backend
+
+# This tells Docker to use your existing network instead of creating a new one
+networks:
+  infra_internal:
+    external: true
