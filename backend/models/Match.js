@@ -1,0 +1,37 @@
+const mongoose = require('mongoose');
+
+const MatchSchema = new mongoose.Schema({
+  user: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true,
+  },
+  matchedUser: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true,
+  },
+  score: {
+    type: Number,
+    required: true,
+  },
+  compatibility: {
+    type: String,
+    enum: ['Strong', 'Moderate', 'Developing'],
+    required: true,
+  },
+  matchReasons: [{
+    type: String,
+  }],
+  isDeleted: {
+    type: Boolean,
+    default: false,
+  },
+}, {
+  timestamps: true,
+});
+
+// Avoid duplicate matches between the same two users
+MatchSchema.index({ user: 1, matchedUser: 1 }, { unique: true });
+
+module.exports = mongoose.model('Match', MatchSchema);

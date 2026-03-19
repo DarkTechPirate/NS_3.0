@@ -1,8 +1,8 @@
 import axios from 'axios';
 
-// Base URL for API — use relative path so Vite proxy handles routing in both dev and Docker
-const API_URL = '/api';
-export const GOOGLE_AUTH_URL = '/api/auth/google';
+// Base URL for API
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+export const GOOGLE_AUTH_URL = `${API_URL}/auth/google`;
 
 const api = axios.create({
     baseURL: API_URL,
@@ -85,102 +85,64 @@ export const uploadProfileImage = async (file) => {
 };
 
 // Match API Calls
-export const getMatches = async () => {
+export const getMatches = async (filters = {}) => {
     try {
-        const response = await api.get('/matches');
-        return { success: true, matches: response.data };
-    } catch (error) {
-        return {
-            success: false,
-            message: error.response?.data?.message || 'Failed to fetch matches',
-            matches: [],
-        };
-    }
-};
-
-export const getMatchDetail = async (id) => {
-    try {
-        const response = await api.get(`/matches/${id}`);
-        return { success: true, match: response.data };
-    } catch (error) {
-        return {
-            success: false,
-            message: error.response?.data?.message || 'Failed to fetch match detail',
-        };
-    }
-};
-
-export const expressInterest = async (id) => {
-    try {
-        const response = await api.post(`/matches/${id}/interest`);
+        const response = await api.get('/matches', { params: filters });
         return response.data;
     } catch (error) {
-        return {
-            success: false,
-            message: error.response?.data?.message || 'Failed to express interest',
-        };
+        console.error('Fetch matches error:', error);
+        throw error.response?.data?.message || 'Failed to fetch matches';
     }
 };
 
-export const declineMatch = async (id) => {
+export const expressInterest = async (matchId) => {
     try {
-        const response = await api.post(`/matches/${id}/decline`);
+        const response = await api.post(`/matches/${matchId}/interest`);
         return response.data;
     } catch (error) {
-        return {
-            success: false,
-            message: error.response?.data?.message || 'Failed to decline match',
-        };
+        console.error('Express interest error:', error);
+        throw error.response?.data?.message || 'Failed to express interest';
     }
 };
 
-export const updateFamilyReview = async (id, data) => {
+// Notification API Calls
+export const getNotifications = async () => {
     try {
-        const response = await api.patch(`/matches/${id}/family-review`, data);
-        return { success: true, ...response.data };
+        const response = await api.get('/notifications');
+        return response.data;
     } catch (error) {
-        return {
-            success: false,
-            message: error.response?.data?.message || 'Failed to update family review',
-        };
+        console.error('Fetch notifications error:', error);
+        throw error.response?.data?.message || 'Failed to fetch notifications';
     }
 };
 
-// Conversation API Calls
-export const getConversations = async () => {
+export const markNotificationAsRead = async (id) => {
     try {
-        const response = await api.get('/conversations');
-        return { success: true, conversations: response.data };
+        const response = await api.patch(`/notifications/${id}/read`);
+        return response.data;
     } catch (error) {
-        return {
-            success: false,
-            message: error.response?.data?.message || 'Failed to fetch conversations',
-            conversations: [],
-        };
+        console.error('Mark notification error:', error);
+        throw error.response?.data?.message || 'Failed to update notification';
     }
 };
 
-export const getMessages = async (conversationId) => {
+export const markAllNotificationsAsRead = async () => {
     try {
-        const response = await api.get(`/conversations/${conversationId}/messages`);
-        return { success: true, data: response.data };
+        const response = await api.patch('/notifications/read-all');
+        return response.data;
     } catch (error) {
-        return {
-            success: false,
-            message: error.response?.data?.message || 'Failed to fetch messages',
-        };
+        console.error('Mark all read error:', error);
+        throw error.response?.data?.message || 'Failed to update notifications';
     }
 };
 
-export const sendMessage = async (conversationId, text) => {
+export const getMatchDetail = async (userId) => {
     try {
-        const response = await api.post(`/conversations/${conversationId}/messages`, { text });
-        return { success: true, message: response.data };
+        const response = await api.get(`/matches/detail/${userId}`);
+        return response.data;
     } catch (error) {
-        return {
-            success: false,
-            message: error.response?.data?.message || 'Failed to send message',
-        };
+        console.error('Fetch match detail error:', error);
+        throw error.response?.data?.message || 'Failed to fetch match details';
     }
 };
 

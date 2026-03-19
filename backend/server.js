@@ -12,8 +12,12 @@ const connectMongo = require("./config/connectMongo");
 
 const authRoutes = require('./routes/authRoutes');
 const profileRoutes = require('./routes/profileRoutes');
+const messagingRoutes = require('./routes/messagingRoutes');
 const matchRoutes = require('./routes/matchRoutes');
-const conversationRoutes = require('./routes/conversationRoutes');
+const adminRoutes = require('./routes/adminRoutes');
+const notificationRoutes = require('./routes/notificationRoutes');
+const sseService = require('./services/sseService');
+const { protect } = require('./middleware/authMiddleware');
 require('./workers/mediaWorker'); // Start the media worker
 
 const app = express();
@@ -89,8 +93,79 @@ app.get(/^\/uploads\/(.+)$/, async (req, res, next) => {
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/profile', profileRoutes);
+app.use('/api/messaging', messagingRoutes);
 app.use('/api/matches', matchRoutes);
-app.use('/api/conversations', conversationRoutes);
+app.use('/api/admin', adminRoutes);
+app.use('/api/notifications', notificationRoutes);
+
+// SSE Endpoint for real-time updates (Keeping for backward compatibility for now)
+app.get('/api/events', protect(), (req, res) => {
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.flushHeaders();
+
+    const userId = req.user._id.toString();
+    sseService.addClient(userId, res);
+
+    // Send initial heartbeat
+    res.write('data: {"type":"CONNECTED"}\n\n');
+
+    // Keep connection alive with heartbeats every 30 seconds
+    const heartbeat = setInterval(() => {
+        res.write('data: {"type":"HEARTBEAT"}\n\n');
+    }, 30000);
+
+    req.on('close', () => {
+        clearInterval(heartbeat);
+    });
+});
+
+// Create HTTP server
+const http = require('http');
+const server = http.createServer(app);
+
+// Initialize Socket.io
+const { Server } = require('socket.io');
+const io = new Server(server, {
+  cors: {
+    origin: process.env.CLIENT_URL || 'http://localhost:5178',
+    credentials: true,
+  },
+});
+
+// Socket Authentication Middleware
+const cookie = require('cookie');
+const jwt = require('jsonwebtoken');
+const User = require('./models/userModel');
+
+io.use(async (socket, next) => {
+  try {
+    const cookies = cookie.parse(socket.handshake.headers.cookie || '');
+    const token = cookies.token;
+
+    if (!token) {
+      return next(new Error('Authentication error: No token provided'));
+    }
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const user = await User.findById(decoded.id).select('-password');
+
+    if (!user) {
+      return next(new Error('Authentication error: User not found'));
+    }
+
+    socket.user = user;
+    next();
+  } catch (err) {
+    console.error('Socket Auth Error:', err.message);
+    next(new Error('Authentication error: Invalid token'));
+  }
+});
+
+// Socket Events
+const socketService = require('./services/socketService');
+socketService.init(io);
 
 app.get('/', (req, res) => {
   res.json({ message: 'Welcome to Namma Sambandhi API', version: '1.0.0' });
@@ -100,7 +175,11 @@ app.get('/', (req, res) => {
 (async () => {
   try {
     await connectMongo();
-    app.listen(PORT, () => {
+
+    // Initialize Workers
+    require('./workers/matchWorker').initMatchWorker();
+
+    server.listen(PORT, () => {
       console.log(`Server is running on port ${PORT}`);
     });
   } catch (err) {

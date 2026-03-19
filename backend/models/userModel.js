@@ -45,6 +45,7 @@ const UserSchema = new Schema(
         createdAt: { type: Date, default: Date.now },
         profilePicture: String,
         role: { type: String, default: "user", enum: ["admin", "user", "staff"] },
+        isVerified: { type: Boolean, default: false },
 
         // --- NEW: Detailed Profile Sections ---
         personalDetails: {

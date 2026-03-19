@@ -15,6 +15,8 @@ import Privacy from './pages/Privacy';
 import Terms from './pages/Terms';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
+import AdminDashboard from './pages/AdminDashboard';
+import AdminRoute from './components/AdminRoute';
 
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
@@ -81,6 +83,12 @@ function App() {
             <ProtectedRoute>
               <ProfileView />
             </ProtectedRoute>
+          } />
+
+          <Route path="/admin" element={
+            <AdminRoute>
+              <AdminDashboard />
+            </AdminRoute>
           } />
 
           <Route path="/onboarding" element={<Onboarding />} />

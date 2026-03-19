@@ -830,7 +830,7 @@ const ProfileCreation = () => {
   const getImageUrl = (path) => {
     if (!path) return '';
     if (path.startsWith('http') || path.startsWith('blob:')) return path;
-    return `http://localhost:5000/uploads/${path}`;
+    return `${import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000'}/uploads/${path}`;
   };
 
   const handleImageUpload = async (e) => {

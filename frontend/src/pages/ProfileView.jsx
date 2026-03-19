@@ -86,7 +86,7 @@ const ProfileView = () => {
                             <div className="w-40 h-40 rounded-full border-4 border-white shadow-md overflow-hidden bg-stone-100">
                                 {profileImages && profileImages.length > 0 ? (
                                     <img
-                                        src={profileImages[0].startsWith('http') ? profileImages[0] : `/uploads/${profileImages[0]}`}
+                                        src={profileImages[0].startsWith('http') ? profileImages[0] : `${import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000'}/uploads/${profileImages[0]}`}
                                         alt="Profile"
                                         className="w-full h-full object-cover"
                                     />
@@ -131,7 +131,7 @@ const ProfileView = () => {
                                     {profileImages.map((img, idx) => (
                                         <div key={idx} className="aspect-square rounded-xl overflow-hidden shadow-sm border border-stone-100">
                                             <img
-                                                src={img.startsWith('http') ? img : `/uploads/${img}`}
+                                                src={img.startsWith('http') ? img : `${import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000'}/uploads/${img}`}
                                                 alt={`Gallery ${idx}`}
                                                 className="w-full h-full object-cover hover:scale-105 transition-transform duration-500"
                                             />
