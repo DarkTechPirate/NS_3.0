@@ -7,7 +7,6 @@ import { getMatches, expressInterest } from '../services/api';
 
 const MemberDashboard = () => {
   const { user } = useAuth();
-  const [declinedMatches, setDeclinedMatches] = useState([]);
   const [matches, setMatches] = useState([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(null);
@@ -32,8 +31,16 @@ const MemberDashboard = () => {
   const visibleMatches = matches.filter(m => !declinedMatches.includes(m._id));
   const remainingCount = visibleMatches.length;
 
-  const handleDecline = (id) => {
-    setDeclinedMatches([...declinedMatches, id]);
+  const handleDecline = async (id) => {
+    setMatches(prev => prev.map(m => m.id === id ? { ...m, status: 'declined' } : m));
+    await declineMatchApi(id);
+  };
+
+  const handleInterest = async (id) => {
+    const res = await expressInterest(id);
+    if (res.success) {
+      setMatches(prev => prev.map(m => m.id === id ? { ...m, status: res.status } : m));
+    }
   };
 
   const handleExpressInterest = async (matchId) => {
@@ -74,7 +81,6 @@ const MemberDashboard = () => {
 
   return (
     <div className="bg-[#FDFBF9] text-[#1a1a1a] font-display min-h-screen flex flex-col antialiased">
-      {/* Header */}
       <Header />
 
       <main className="flex-grow px-6 md:px-12 lg:px-20 py-10 mx-auto w-full max-w-6xl">
@@ -90,12 +96,7 @@ const MemberDashboard = () => {
             Your personal concierge has curated these introductions based on your values and preferences.
           </p>
 
-          {/* Subtle Status Indicators */}
           <div className="flex items-center gap-6 mt-6">
-            <div className="flex items-center gap-2 text-sm text-stone-400">
-              <span className="material-symbols-outlined text-base">schedule</span>
-              <span>Next selection in 3 days</span>
-            </div>
             <div className="flex items-center gap-2 text-sm text-stone-400">
               <span className="material-symbols-outlined text-base">group</span>
               <span>{remainingCount} {remainingCount === 1 ? 'match' : 'matches'} remaining</span>
@@ -227,14 +228,13 @@ const MemberDashboard = () => {
             <div className="w-16 h-16 rounded-full bg-stone-100 flex items-center justify-center mx-auto mb-6">
               <span className="material-symbols-outlined text-3xl text-stone-400">group</span>
             </div>
-            <h2 className="text-xl font-serif font-medium text-[#1a1a1a] mb-2">No matches remaining</h2>
+            <h2 className="text-xl font-serif font-medium text-[#1a1a1a] mb-2">No matches yet</h2>
             <p className="text-stone-500 max-w-md mx-auto">
-              You've reviewed all introductions for this week. Your next curated selection will arrive in 3 days.
+              Your curated selections will appear here once our team has reviewed your profile.
             </p>
           </div>
         )}
 
-        {/* Privacy Note */}
         {visibleMatches.length > 0 && (
           <div className="mt-16 text-center">
             <p className="text-sm text-stone-400 flex items-center justify-center gap-2">

@@ -71,7 +71,7 @@ const Header = ({ variant = 'default' }) => {
   // Image URL Logic
   const BACKEND_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000'; 
   const userImage = user?.profilePicture ?
-    (user.profilePicture.startsWith('http') ? user.profilePicture : `${BACKEND_URL}/uploads/${user.profilePicture}`)
+    (user.profilePicture.startsWith('http') ? user.profilePicture : `/uploads/${user.profilePicture}`)
     : null;
 
   return (

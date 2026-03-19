@@ -54,23 +54,24 @@ const FamilyViewMode = () => {
   };
 
   const handleShortlist = (id) => {
-    if (shortlisted.includes(id)) {
-      setShortlisted(shortlisted.filter(i => i !== id));
-    } else {
-      setShortlisted([...shortlisted, id]);
-    }
+    const newValue = !shortlisted.includes(id);
+    setShortlisted(newValue ? [...shortlisted, id] : shortlisted.filter(i => i !== id));
+    updateFamilyReview(id, { familyShortlisted: newValue });
   };
 
   const handleFlag = (id) => {
-    if (flagged.includes(id)) {
-      setFlagged(flagged.filter(i => i !== id));
-    } else {
-      setFlagged([...flagged, id]);
-    }
+    const newValue = !flagged.includes(id);
+    setFlagged(newValue ? [...flagged, id] : flagged.filter(i => i !== id));
+    updateFamilyReview(id, { familyFlagged: newValue });
   };
 
   const handleNoteChange = (id, note) => {
     setNotes({ ...notes, [id]: note });
+  };
+
+  const handleNoteDone = (id) => {
+    setActiveNoteId(null);
+    updateFamilyReview(id, { familyNotes: notes[id] || '' });
   };
 
   return (
@@ -181,6 +182,30 @@ const FamilyViewMode = () => {
             Review these profiles from a family and long-term perspective. You can shortlist, add notes, or flag profiles for discussion with the profile owner.
           </p>
         </div>
+
+        {/* Loading State */}
+        {loading && (
+          <div className="flex flex-col items-center justify-center py-20">
+            <div className="w-10 h-10 border-2 border-stone-300 border-t-stone-600 rounded-full animate-spin mb-4"></div>
+            <p className="text-stone-500">Loading profiles...</p>
+          </div>
+        )}
+
+        {/* Error State */}
+        {error && !loading && (
+          <div className="text-center py-20">
+            <span className="material-symbols-outlined text-4xl text-stone-300 mb-4 block">error</span>
+            <p className="text-stone-500">{error}</p>
+          </div>
+        )}
+
+        {/* Empty State */}
+        {!loading && !error && profiles.length === 0 && (
+          <div className="text-center py-20">
+            <span className="material-symbols-outlined text-4xl text-stone-300 mb-4 block">group</span>
+            <p className="text-stone-500">No profiles to review yet. Check back later!</p>
+          </div>
+        )}
 
         {/* Profile Cards */}
         {loading ? (

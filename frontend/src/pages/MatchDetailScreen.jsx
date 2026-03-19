@@ -202,7 +202,9 @@ const MatchDetailScreen = () => {
                         <h4 className="text-ink font-bold text-base mb-1">Point of Resonance</h4>
                         <p className="text-ink-light text-sm font-light leading-relaxed">{reason}</p>
                       </div>
+                      <h3 className="text-2xl font-serif font-bold text-ink">Why we paired you</h3>
                     </div>
+                    <p className="text-ink-light text-sm font-light leading-relaxed pl-11">These are the strongest points of alignment identified during curation.</p>
                   </div>
                 ))}
               </div>
