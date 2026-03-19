@@ -4,7 +4,7 @@
   "description": "Backend API for Namma Sambandhi Matrimony Platform",
   "main": "server.js",
   "scripts": {
-    "start": "concurrently \"node server.js\" \"node workers/index.js\"",
+    "start": "node server.js & node workers/index.js",
     "worker": "node workers/index.js",
     "dev": "concurrently \"nodemon server.js\" \"nodemon workers/index.js\""
   },
@@ -29,7 +29,6 @@
     "socket.io": "^4.8.3"
   },
   "devDependencies": {
-    "concurrently": "^9.2.1",
     "nodemon": "^3.0.1"
   }
 }
