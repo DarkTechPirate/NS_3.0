@@ -9,21 +9,11 @@ services:
     ports:
       - "3002:5000" # Backend API
       - "3003:5000" # Socket.io
+    env_file:
+      - ./backend/.env # <-- Tell Docker to load the env file directly into the container
     environment:
       - PORT=5000
-      # Provide these via host environment or a .env file on the VPS
-      - MONGO_URI=${MONGO_URI}
-      - REDIS_HOST=${REDIS_HOST}
-      - REDIS_PORT=${REDIS_PORT:-6379}
-      - MINIO_ENDPOINT=${MINIO_ENDPOINT}
-      - MINIO_PORT=${MINIO_PORT:-9000}
-      - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY}
-      - MINIO_SECRET_KEY=${MINIO_SECRET_KEY}
-      - MINIO_BUCKET_NAME=${MINIO_BUCKET_NAME:-nammasambandi}
-      - USE_MINIO=${USE_MINIO:-true}
-      - JWT_SECRET=${JWT_SECRET}
-      - CLIENT_URL=${CLIENT_URL:-http://localhost:5001}
-      - BACKEND_URL=${BACKEND_URL:-http://localhost:3002}
+      # You can remove all the ${VARIABLE} mappings here since env_file handles it
 
   frontend:
     build:
@@ -34,6 +24,6 @@ services:
     container_name: ns_frontend
     restart: always
     ports:
-      - "5001:80" # Frontend serving (mapped to Nginx)
+      - "5001:80"
     depends_on:
       - backend
