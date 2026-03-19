@@ -18,7 +18,7 @@ const adminRoutes = require('./routes/adminRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
 const sseService = require('./services/sseService');
 const { protect } = require('./middleware/authMiddleware');
-require('./workers/mediaWorker'); // Start the media worker
+
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -176,8 +176,7 @@ app.get('/', (req, res) => {
   try {
     await connectMongo();
 
-    // Initialize Workers
-    require('./workers/matchWorker').initMatchWorker();
+
 
     server.listen(PORT, () => {
       console.log(`Server is running on port ${PORT}`);
