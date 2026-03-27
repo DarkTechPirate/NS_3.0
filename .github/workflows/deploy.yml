@@ -20,10 +20,20 @@ jobs:
           script: |
             set -e
             cd /opt/apps/NS_3.0
-            # Resolve permission issues on VPS
+            
+            # NOTE: Ensure the 'ops' user owns /opt/apps/NS_3.0 on the VPS:
+            # sudo chown -R ops:ops /opt/apps/NS_3.0
+            # Also ensure 'ops' is in the 'docker' group:
+            # sudo usermod -aG docker ops
+            
+            # Resolve potential git ownership issues
             git config --global --add safe.directory /opt/apps/NS_3.0
-            sudo git fetch origin main
-            sudo git reset --hard origin/main
-            sudo docker compose down --remove-orphans
-            sudo docker system prune -f
-            sudo docker compose up -d --build
+            
+            # Fetch and reset without sudo (assuming ownership is fixed)
+            git fetch origin main
+            git reset --hard origin/main
+            
+            # Docker operations (assuming user is in docker group)
+            docker compose down --remove-orphans
+            docker system prune -f
+            docker compose up -d --build
