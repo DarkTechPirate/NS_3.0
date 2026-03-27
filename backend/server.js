@@ -4,7 +4,6 @@ const cookieParser = require('cookie-parser');
 const bodyParser = require("body-parser");
 const passport = require('passport');
 const path = require('path');
-require('dotenv').config();
 
 // Configs
 require('./config/passport')(passport);
