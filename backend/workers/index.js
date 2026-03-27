@@ -1,3 +1,5 @@
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '../.env') });
 const connectMongo = require("../config/connectMongo");
 const { mediaQueue } = require("../services/queue"); // Import queue to check jobs
 
