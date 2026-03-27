@@ -1,0 +1,33 @@
+name: "deploy:nammasambandi"
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    name: deploy-to-vps
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy nammasambandi app
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ops
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            set -e
+            cd /opt/apps/NS_3.0
+            git pull origin main
+            
+            # Stop existing containers and remove orphans
+            docker compose down --remove-orphans
+            
+            # Clear old builds and unused Docker resources
+            docker system prune -f
+            
+            # Rebuild and start the application
+            docker compose build
+            docker compose up -d
