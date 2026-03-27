@@ -25,10 +25,13 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        - VITE_API_URL=${VITE_API_URL:-https://api.nammasambandhi.com/api}
+        - VITE_SOCKET_URL=${VITE_SOCKET_URL:-https://api.nammasambandhi.com}
     container_name: ns_30-frontend
     restart: unless-stopped
     ports:
-      - "127.0.0.1:5178:5178"
+      - "127.0.0.1:5178:80"
     networks:
       - infra_internal
     depends_on:
