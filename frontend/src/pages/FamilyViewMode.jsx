@@ -15,6 +15,7 @@ const FamilyViewMode = () => {
   // Dynamic State
   const [matches, setMatches] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [filters, setFilters] = useState({
     community: '',
     education: '',
@@ -30,12 +31,23 @@ const FamilyViewMode = () => {
   const fetchMatches = async () => {
     try {
       setLoading(true);
+      setError(null);
       const res = await getMatches(filters);
       setMatches(res.data);
-    } catch (error) {
-      console.error("Failed to fetch matches", error);
+    } catch (err) {
+      setError(err.message || "Failed to fetch matches");
+      console.error("Failed to fetch matches", err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const updateFamilyReview = async (id, data) => {
+    try {
+      console.log(`[FamilyView] Updating review for match ${id}:`, data);
+      // Backend integration for family reviews can be added here
+    } catch (err) {
+      console.error("Failed to update family review", err);
     }
   };
 
@@ -200,7 +212,7 @@ const FamilyViewMode = () => {
         )}
 
         {/* Empty State */}
-        {!loading && !error && profiles.length === 0 && (
+        {!loading && !error && matches.length === 0 && (
           <div className="text-center py-20">
             <span className="material-symbols-outlined text-4xl text-stone-300 mb-4 block">group</span>
             <p className="text-stone-500">No profiles to review yet. Check back later!</p>
