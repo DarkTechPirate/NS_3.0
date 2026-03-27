@@ -20,14 +20,10 @@ jobs:
           script: |
             set -e
             cd /opt/apps/NS_3.0
-            git pull origin main
-            
-            # Stop existing containers and remove orphans
-            docker compose down --remove-orphans
-            
-            # Clear old builds and unused Docker resources
-            docker system prune -f
-            
-            # Rebuild and start the application
-            docker compose build
-            docker compose up -d
+            # Resolve permission issues on VPS
+            git config --global --add safe.directory /opt/apps/NS_3.0
+            sudo git fetch origin main
+            sudo git reset --hard origin/main
+            sudo docker compose down --remove-orphans
+            sudo docker system prune -f
+            sudo docker compose up -d --build
