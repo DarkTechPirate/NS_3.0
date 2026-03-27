@@ -1,4 +1,3 @@
-require("dotenv").config();
 const connectMongo = require("../config/connectMongo");
 const { mediaQueue } = require("../services/queue"); // Import queue to check jobs
 
