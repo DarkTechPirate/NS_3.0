@@ -80,9 +80,7 @@ export const uploadProfileImage = async (file) => {
     try {
         const formData = new FormData();
         formData.append('image', file);
-        const response = await api.post('/profile/profile-image', formData, {
-            headers: { 'Content-Type': 'multipart/form-data' },
-        });
+        const response = await api.post('/profile/profile-image', formData);
         return response.data;
     } catch (error) {
         throw error.response?.data?.message || 'Upload failed';

@@ -4,7 +4,7 @@ import Logo from '../components/Logo';
 import Header from '../components/Header';
 import { uploadProfileImage, updateProfileInfo } from '../services/api';
 import { useAuth } from '../context/AuthContext';
-import { isProfileComplete } from '../utils/profileCompletion';
+import { getProfileCompletionFromForm, isProfileComplete } from '../utils/profileCompletion';
 import { getBackendBaseUrl } from '../utils/backendUrl';
 const ProfileCreation = () => {
   const { user, setUser } = useAuth();
@@ -215,22 +215,7 @@ const ProfileCreation = () => {
     { id: 'values', label: 'Values & Lifestyle', icon: 'favorite', status: 'optional' },
     { id: 'portfolio', label: 'Visual Portfolio', icon: 'photo_library', status: 'pending' }
   ];
-
-  const getProgress = () => {
-    let filled = 0;
-    let total = 10;
-    if (formData.firstName) filled++;
-    if (formData.lastName) filled++;
-    if (formData.dateOfBirth) filled++;
-    if (formData.gender) filled++;
-    if (formData.religion) filled++;
-    if (formData.community) filled++;
-    if (formData.currentCity) filled++;
-    if (formData.maritalStatus) filled++;
-    if (formData.aboutText) filled++;
-    if (formData.motherTongue) filled++;
-    return Math.round((filled / total) * 100);
-  };
+  const completionProgress = getProfileCompletionFromForm(formData);
 
   const handleInputChange = (field, value) => {
     setFormData({ ...formData, [field]: value });
@@ -841,6 +826,18 @@ const ProfileCreation = () => {
     const file = e.target.files[0];
     if (!file) return;
 
+    const maxImageSizeBytes = 15 * 1024 * 1024;
+    if (!file.type.startsWith('image/')) {
+      alert('Please upload a valid image file.');
+      e.target.value = '';
+      return;
+    }
+    if (file.size > maxImageSizeBytes) {
+      alert('Image size must be less than 15MB.');
+      e.target.value = '';
+      return;
+    }
+
     setUploading(true);
     try {
       const res = await uploadProfileImage(file);
@@ -858,9 +855,11 @@ const ProfileCreation = () => {
       }
     } catch (err) {
       console.error("Upload failed", err);
-      alert("Failed to upload image. Please try again.");
+      const message = typeof err === 'string' ? err : err?.message || "Failed to upload image. Please try again.";
+      alert(message);
     } finally {
       setUploading(false);
+      e.target.value = '';
     }
   };
 
@@ -1058,10 +1057,10 @@ const ProfileCreation = () => {
             <div className="flex flex-col gap-3 p-5 rounded-2xl bg-white border border-subtle-border shadow-soft">
               <div className="flex gap-6 justify-between items-center">
                 <p className="text-charcoal text-base font-serif font-medium">Profile Status</p>
-                <p className="text-rajkumari text-sm font-bold">{getProgress()}%</p>
+                <p className="text-rajkumari text-sm font-bold">{completionProgress}%</p>
               </div>
               <div className="rounded-full bg-ivory border border-subtle-border h-2 overflow-hidden">
-                <div className="h-full rounded-full bg-rajkumari shadow-glow transition-all" style={{ width: `${getProgress()}%` }}></div>
+                <div className="h-full rounded-full bg-rajkumari shadow-glow transition-all" style={{ width: `${completionProgress}%` }}></div>
               </div>
               <p className="text-slate-grey/80 text-xs">Authenticity attracts the right match.</p>
             </div>
