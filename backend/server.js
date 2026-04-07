@@ -23,6 +23,12 @@ const { protect } = require('./middleware/authMiddleware');
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+const corsOptions = {
+  origin: process.env.CLIENT_URL || 'http://localhost:5178',
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+};
+
 // FEATURE TOGGLE
 const USE_MINIO = process.env.USE_MINIO === "true"; // Set this in .env if you want to use MinIO
 
@@ -39,13 +45,8 @@ if (USE_MINIO) {
 }
 
 // Middleware
-app.use(
-  cors({
-    origin: process.env.CLIENT_URL || 'http://localhost:5178',
-    credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE'],
-  })
-);
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
 app.use(express.json());
 app.use(bodyParser.json());
 app.use(express.urlencoded({ extended: true }));
@@ -135,6 +136,10 @@ app.get('/api/events', protect(), (req, res) => {
 // Create HTTP server
 const http = require('http');
 const server = http.createServer(app);
+
+// Prevent stale keep-alive socket reuse issues behind reverse proxies.
+server.keepAliveTimeout = 65000;
+server.headersTimeout = 66000;
 
 // Initialize Socket.io
 const { Server } = require('socket.io');
