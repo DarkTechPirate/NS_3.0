@@ -2,10 +2,13 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import Logo from '../components/Logo';
 import Header from '../components/Header';
-import { uploadProfileImage } from '../services/api';
+import { uploadProfileImage, updateProfileInfo } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { isProfileComplete } from '../utils/profileCompletion';
+import { getBackendBaseUrl } from '../utils/backendUrl';
 const ProfileCreation = () => {
   const { user, setUser } = useAuth();
+  const backendBaseUrl = getBackendBaseUrl();
   const navigate = useNavigate();
   const [activeSection, setActiveSection] = useState('personal');
   const [uploading, setUploading] = useState(false);
@@ -72,6 +75,7 @@ const ProfileCreation = () => {
         caste: user.personalDetails?.caste || '',
         motherTongue: user.personalDetails?.motherTongue || '',
         aboutText: user.personalDetails?.about || '',
+        currentCity: user.personalDetails?.city || user.addresses?.[0]?.city || '',
 
         // Career
         highestEducation: user.careerDetails?.education || '',
@@ -830,7 +834,7 @@ const ProfileCreation = () => {
   const getImageUrl = (path) => {
     if (!path) return '';
     if (path.startsWith('http') || path.startsWith('blob:')) return path;
-    return `${import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000'}/uploads/${path}`;
+    return `${backendBaseUrl}/uploads/${path}`;
   };
 
   const handleImageUpload = async (e) => {
@@ -964,6 +968,7 @@ const ProfileCreation = () => {
         caste: formData.caste,
         motherTongue: formData.motherTongue,
         about: formData.aboutText,
+        city: formData.currentCity,
         // jathagam is handled separately via upload currently, or needs logic
       },
       careerDetails: {
@@ -1004,18 +1009,29 @@ const ProfileCreation = () => {
     try {
       setUploading(true);
       const payload = getPayload();
-      const res = await import('../services/api').then(mod => mod.updateProfileInfo(payload)); // dynamic import to avoid circular dep if any, or just import at top
+      const res = await updateProfileInfo(payload);
 
       if (res.success) {
-        if (!isDraft) {
-          const currentIndex = sections.findIndex(s => s.id === activeSection);
-          if (currentIndex < sections.length - 1) {
-            setActiveSection(sections[currentIndex + 1].id);
-          } else {
-            // Final submit
-            navigate('/profile');
-          }
+        const nextUser = res.user || user;
+
+        if (res.user) {
+          setUser(res.user);
+        }
+
+        if (isDraft) {
+          alert('Draft saved successfully.');
+          return;
+        }
+
+        const currentIndex = sections.findIndex(s => s.id === activeSection);
+        if (currentIndex < sections.length - 1) {
+          setActiveSection(sections[currentIndex + 1].id);
         } else {
+          if (!isProfileComplete(nextUser)) {
+            alert('Please complete all required fields and upload at least one photo before submitting.');
+            return;
+          }
+
           navigate('/profile');
         }
       } else {

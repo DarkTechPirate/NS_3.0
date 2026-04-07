@@ -112,15 +112,32 @@ exports.uploadProfilePicture = async (req, res) => {
                 .json({ success: false, message: "No image uploaded" });
         }
 
-        // Add Job to Queue and get anticipated path
-        const publicPath = await enqueueMedia(req.file, req.user._id, "User", "profilePicture");
+        const useMinio = process.env.USE_MINIO === "true";
 
-        res.status(200).json({
+        if (useMinio) {
+            // Add Job to Queue and get anticipated path
+            const publicPath = await enqueueMedia(
+                req.file,
+                req.user._id,
+                "User",
+                "profilePicture"
+            );
+
+            return res.status(200).json({
+                success: true,
+                message: "Profile picture processing started",
+                filePath: publicPath.replace(/^\/uploads\//, ""),
+            });
+        }
+
+        // Local filesystem mode: immediately persist and return relative path.
+        const relativePath = req.file.filename;
+        await User.findByIdAndUpdate(req.user._id, { profilePicture: relativePath });
+
+        return res.status(200).json({
             success: true,
-            message: "Profile picture processing started",
-            filePath: publicPath.replace(/^\/uploads\//, ""), // Frontend expects relative path? Or just path logic.
-            // ProfileCreation.jsx adds http://localhost:5000/uploads/ + res.filePath
-            // If publicPath is /uploads/user/foo.webp, and we return user/foo.webp, then frontend becomes /uploads/user/foo.webp. Correct.
+            message: "Profile picture uploaded successfully",
+            filePath: relativePath,
         });
     } catch (error) {
         console.error("Profile Upload Error:", error);

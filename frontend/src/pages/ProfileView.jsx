@@ -2,9 +2,11 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import Header from '../components/Header';
 import { useAuth } from '../context/AuthContext';
+import { getBackendBaseUrl } from '../utils/backendUrl';
 
 const ProfileView = () => {
     const { user } = useAuth();
+    const backendBaseUrl = getBackendBaseUrl();
 
     if (!user) {
         return <div className="flex justify-center items-center h-screen">Loading profile...</div>;
@@ -31,7 +33,7 @@ const ProfileView = () => {
                 { label: "Religion", value: personalDetails?.religion || 'Not Set' },
                 { label: "Community", value: personalDetails?.community || 'Not Set' },
                 { label: "Mother Tongue", value: personalDetails?.motherTongue || 'Not Set' },
-                { label: "City", value: user.addresses?.[0]?.city || 'Not Set' }, // Assuming address structure or just use what we have in form
+                { label: "City", value: personalDetails?.city || user.addresses?.[0]?.city || 'Not Set' },
             ]
         },
         {
@@ -86,7 +88,7 @@ const ProfileView = () => {
                             <div className="w-40 h-40 rounded-full border-4 border-white shadow-md overflow-hidden bg-stone-100">
                                 {profileImages && profileImages.length > 0 ? (
                                     <img
-                                        src={profileImages[0].startsWith('http') ? profileImages[0] : `${import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000'}/uploads/${profileImages[0]}`}
+                                        src={profileImages[0].startsWith('http') ? profileImages[0] : `${backendBaseUrl}/uploads/${profileImages[0]}`}
                                         alt="Profile"
                                         className="w-full h-full object-cover"
                                     />
@@ -131,7 +133,7 @@ const ProfileView = () => {
                                     {profileImages.map((img, idx) => (
                                         <div key={idx} className="aspect-square rounded-xl overflow-hidden shadow-sm border border-stone-100">
                                             <img
-                                                src={img.startsWith('http') ? img : `${import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000'}/uploads/${img}`}
+                                                src={img.startsWith('http') ? img : `${backendBaseUrl}/uploads/${img}`}
                                                 alt={`Gallery ${idx}`}
                                                 className="w-full h-full object-cover hover:scale-105 transition-transform duration-500"
                                             />

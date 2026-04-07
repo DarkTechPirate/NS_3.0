@@ -17,12 +17,16 @@ import Login from './pages/Login';
 import Signup from './pages/Signup';
 import AdminDashboard from './pages/AdminDashboard';
 import AdminRoute from './components/AdminRoute';
+import { isProfileComplete } from './utils/profileCompletion';
 
 // Protected Route Component
-const ProtectedRoute = ({ children }) => {
+const ProtectedRoute = ({ children, requireCompleteProfile = false }) => {
   const { user, loading } = useAuth();
   if (loading) return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
   if (!user) return <Navigate to="/login" replace />;
+  if (requireCompleteProfile && !isProfileComplete(user)) {
+    return <Navigate to="/create-profile" replace />;
+  }
   return children;
 };
 
@@ -30,7 +34,9 @@ const ProtectedRoute = ({ children }) => {
 const PublicRoute = ({ children }) => {
   const { user, loading } = useAuth();
   if (loading) return null; // Or spinner
-  if (user) return <Navigate to="/dashboard" replace />;
+  if (user) {
+    return <Navigate to={isProfileComplete(user) ? '/dashboard' : '/create-profile'} replace />;
+  }
   return children;
 };
 
@@ -55,17 +61,17 @@ function App() {
 
           {/* Protected Routes */}
           <Route path="/dashboard" element={
-            <ProtectedRoute>
+            <ProtectedRoute requireCompleteProfile>
               <MemberDashboard />
             </ProtectedRoute>
           } />
           <Route path="/family-view" element={
-            <ProtectedRoute>
+            <ProtectedRoute requireCompleteProfile>
               <FamilyViewMode />
             </ProtectedRoute>
           } />
           <Route path="/match-detail/:id" element={
-            <ProtectedRoute>
+            <ProtectedRoute requireCompleteProfile>
               <MatchDetailScreen />
             </ProtectedRoute>
           } />
@@ -75,12 +81,12 @@ function App() {
             </ProtectedRoute>
           } />
           <Route path="/messages" element={
-            <ProtectedRoute>
+            <ProtectedRoute requireCompleteProfile>
               <Messages />
             </ProtectedRoute>
           } />
           <Route path="/profile" element={
-            <ProtectedRoute>
+            <ProtectedRoute requireCompleteProfile>
               <ProfileView />
             </ProtectedRoute>
           } />

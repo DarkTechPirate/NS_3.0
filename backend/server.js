@@ -91,6 +91,17 @@ app.get(/^\/uploads\/(.+)$/, async (req, res, next) => {
 });
 
 // Routes
+// Backward-compatible redirects for legacy Google auth paths.
+app.get('/auth/google', (req, res) => {
+  res.redirect(302, '/api/auth/google');
+});
+
+app.get('/auth/google/callback', (req, res) => {
+  const queryIndex = req.originalUrl.indexOf('?');
+  const query = queryIndex >= 0 ? req.originalUrl.slice(queryIndex) : '';
+  res.redirect(302, `/api/auth/google/callback${query}`);
+});
+
 app.use('/api/auth', authRoutes);
 app.use('/api/profile', profileRoutes);
 app.use('/api/messaging', messagingRoutes);

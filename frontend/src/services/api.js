@@ -1,7 +1,12 @@
 import axios from 'axios';
 
 // Base URL for API
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+const normalizeApiBaseUrl = (url) => {
+    const trimmed = url.replace(/\/+$/, '');
+    return trimmed.endsWith('/api') ? trimmed : `${trimmed}/api`;
+};
+
+const API_URL = normalizeApiBaseUrl(import.meta.env.VITE_API_URL || 'http://localhost:5000/api');
 export const GOOGLE_AUTH_URL = `${API_URL}/auth/google`;
 
 const api = axios.create({

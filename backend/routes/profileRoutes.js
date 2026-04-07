@@ -2,16 +2,22 @@ const express = require("express");
 const router = express.Router();
 const multer = require("multer");
 const path = require("path");
+const fs = require("fs");
 const { protect } = require("../middleware/authMiddleware");
 const {
     PersonalInfo,
     uploadProfilePicture,
 } = require("../controllers/profileControllers");
 
+const uploadDir = path.join(__dirname, "../public/uploads");
+
 // --- MULTER CONFIGURATION ---
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
-        cb(null, "public/uploads/");
+        if (!fs.existsSync(uploadDir)) {
+            fs.mkdirSync(uploadDir, { recursive: true });
+        }
+        cb(null, uploadDir);
     },
     filename: (req, file, cb) => {
         // Unique suffix to prevent filename collisions

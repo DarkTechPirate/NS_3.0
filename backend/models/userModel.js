@@ -56,6 +56,7 @@ const UserSchema = new Schema(
             community: String,
             caste: String,
             motherTongue: String,
+            city: String,
             about: String,
             jathagam: String, // URL/Path to file
         },

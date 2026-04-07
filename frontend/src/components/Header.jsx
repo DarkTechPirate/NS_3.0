@@ -3,6 +3,8 @@ import { Link, useLocation } from 'react-router-dom';
 import Logo from './Logo';
 import { useAuth } from '../context/AuthContext';
 import { getNotifications, markNotificationAsRead, markAllNotificationsAsRead } from '../services/api';
+import { isProfileComplete } from '../utils/profileCompletion';
+import { getBackendBaseUrl } from '../utils/backendUrl';
 
 const Header = ({ variant = 'default' }) => {
   const location = useLocation();
@@ -13,6 +15,7 @@ const Header = ({ variant = 'default' }) => {
 
   // Determine variant based on auth state if not explicitly passed
   const isAuth = user || variant === 'authenticated';
+  const profileComplete = isProfileComplete(user);
   const userName = user?.fullname || 'Guest';
 
   useEffect(() => {
@@ -55,23 +58,24 @@ const Header = ({ variant = 'default' }) => {
   };
 
   // Navigation links based on auth state
-  const navLinks = isAuth ? [
-    { path: '/dashboard', label: 'My Matches' },
-    { path: '/family-view', label: 'Family View' },
-    { path: '/messages', label: 'Messages' },
-    {
-      path: user?.personalDetails ? '/profile' : '/create-profile',
-      label: 'Profile'
-    },
-  ] : [];
+  const navLinks = isAuth
+    ? profileComplete
+      ? [
+        { path: '/dashboard', label: 'My Matches' },
+        { path: '/family-view', label: 'Family View' },
+        { path: '/messages', label: 'Messages' },
+        { path: '/profile', label: 'Profile' },
+      ]
+      : [{ path: '/create-profile', label: 'Complete Profile' }]
+    : [];
 
   const isActive = (path) => location.pathname === path;
 
   // Image URL Logic
   // Image URL Logic
-  const BACKEND_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000'; 
+  const BACKEND_URL = getBackendBaseUrl();
   const userImage = user?.profilePicture ?
-    (user.profilePicture.startsWith('http') ? user.profilePicture : `/uploads/${user.profilePicture}`)
+    (user.profilePicture.startsWith('http') ? user.profilePicture : `${BACKEND_URL}/uploads/${user.profilePicture}`)
     : null;
 
   return (
@@ -188,7 +192,7 @@ const Header = ({ variant = 'default' }) => {
                 >
                   <span className="material-symbols-outlined text-xl">logout</span>
                 </button>
-                <Link to={user?.personalDetails ? '/profile' : '/create-profile'}>
+                <Link to={profileComplete ? '/profile' : '/create-profile'}>
                   <div
                     className="size-10 rounded-full bg-gradient-to-br from-primary to-secondary bg-center bg-cover border-2 border-white shadow-sm cursor-pointer"
                     style={userImage ? { backgroundImage: `url('${userImage}')` } : {}}
