@@ -40,6 +40,25 @@ const upload = multer({
     limits: { fileSize: 1024 * 1024 * 15 }, // 15MB limit
 });
 
+const profileImageUploadMiddleware = (req, res, next) => {
+    const uploader = upload.fields([
+        { name: "image", maxCount: 1 },
+        { name: "file", maxCount: 1 },
+    ]);
+
+    uploader(req, res, (err) => {
+        if (err) {
+            return res.status(400).json({
+                success: false,
+                message: err.message || "Image upload failed",
+            });
+        }
+
+        req.file = req.files?.image?.[0] || req.files?.file?.[0] || null;
+        next();
+    });
+};
+
 // --- ROUTES ---
 
 // 1. Text Info Update
@@ -49,7 +68,7 @@ router.put("/info", protect(), PersonalInfo);
 router.post(
     "/profile-image",
     protect(),
-    upload.single("image"), // Looks for form-data field named 'image'
+    profileImageUploadMiddleware,
     uploadProfilePicture
 );
 
