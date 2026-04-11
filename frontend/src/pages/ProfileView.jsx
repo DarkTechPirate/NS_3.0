@@ -2,6 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import Header from '../components/Header';
 import { useAuth } from '../context/AuthContext';
+import { getBackendBaseUrl } from '../utils/backendUrl';
 
 const getImageUrl = (path) => {
   if (!path) return '';
@@ -12,6 +13,7 @@ const getImageUrl = (path) => {
 
 const ProfileView = () => {
     const { user } = useAuth();
+    const backendBaseUrl = getBackendBaseUrl();
 
     if (!user) {
         return <div className="flex justify-center items-center h-screen">Loading profile...</div>;
@@ -38,7 +40,7 @@ const ProfileView = () => {
                 { label: "Religion", value: personalDetails?.religion || 'Not Set' },
                 { label: "Community", value: personalDetails?.community || 'Not Set' },
                 { label: "Mother Tongue", value: personalDetails?.motherTongue || 'Not Set' },
-                { label: "City", value: user.addresses?.[0]?.city || 'Not Set' }, // Assuming address structure or just use what we have in form
+                { label: "City", value: personalDetails?.city || user.addresses?.[0]?.city || 'Not Set' },
             ]
         },
         {

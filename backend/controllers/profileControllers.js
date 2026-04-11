@@ -124,7 +124,11 @@ exports.uploadProfilePicture = async (req, res) => {
         // Add Job to Queue and get anticipated path
         const publicPath = await enqueueMedia(req.file, req.user._id, "User", "profilePicture", "set");
 
-        res.status(200).json({
+        // Local filesystem mode: immediately persist and return relative path.
+        const relativePath = req.file.filename;
+        await User.findByIdAndUpdate(req.user._id, { profilePicture: relativePath });
+
+        return res.status(200).json({
             success: true,
             message: "Profile picture processing started",
             filePath: publicPath.replace(/^\/uploads\//, ""),

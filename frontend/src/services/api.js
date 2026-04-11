@@ -1,15 +1,17 @@
 import axios from 'axios';
 
 // Base URL for API
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+const normalizeApiBaseUrl = (url) => {
+    const trimmed = url.replace(/\/+$/, '');
+    return trimmed.endsWith('/api') ? trimmed : `${trimmed}/api`;
+};
+
+const API_URL = normalizeApiBaseUrl(import.meta.env.VITE_API_URL || 'http://localhost:5000/api');
 export const GOOGLE_AUTH_URL = `${API_URL}/auth/google`;
 
 const api = axios.create({
     baseURL: API_URL,
     withCredentials: true, // Important for cookies
-    headers: {
-        'Content-Type': 'application/json',
-    },
 });
 
 // Auth API Calls
@@ -75,8 +77,8 @@ export const uploadProfileImage = async (file) => {
     try {
         const formData = new FormData();
         formData.append('image', file);
-        const response = await api.post('/profile/profile-image', formData, {
-            headers: { 'Content-Type': 'multipart/form-data' },
+        const response = await axios.post(`${API_URL}/profile/profile-image`, formData, {
+            withCredentials: true,
         });
         return response.data;
     } catch (error) {
