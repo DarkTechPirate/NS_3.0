@@ -6,8 +6,9 @@ const { mediaQueue } = require("./queue");
  * @param {String} fileId - The ID of the database document to update (User ID or Gallery ID).
  * @param {String} modelName - The Mongoose model name ("User" or "Gallery").
  * @param {String} fieldName - The field in the model to update ("profilePicture" or "url").
+ * @param {String} operation - The Mongoose operation ("set" or "push"). Defaults to "set".
  */
-const enqueueMedia = async (file, fileId, modelName, fieldName) => {
+const enqueueMedia = async (file, fileId, modelName, fieldName, operation = "set") => {
     const timestamp = Date.now();
     const finalFilename = `${modelName.toLowerCase()}-${fileId}-${timestamp}.webp`;
     const objectKey = `${modelName.toLowerCase()}/${finalFilename}`;
@@ -20,6 +21,7 @@ const enqueueMedia = async (file, fileId, modelName, fieldName) => {
         outputDir: "public/uploads/",
         modelName,
         fieldName,
+        operation, // Pass operation to worker
         finalFilename, // Pass specific name
         publicPath,    // Pass specific path
     });

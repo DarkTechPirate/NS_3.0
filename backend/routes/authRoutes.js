@@ -53,6 +53,7 @@ router.get(
 
         // 2. Redirect to Frontend Dashboard
         const clientUrl = process.env.CLIENT_URL || "http://localhost:5174";
+        console.log("GOOGLE_AUTH_CALLBACK: Redirecting to:", `${clientUrl}/dashboard`);
         res.redirect(`${clientUrl}/dashboard`);
     }
 );

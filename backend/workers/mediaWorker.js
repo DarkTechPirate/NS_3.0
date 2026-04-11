@@ -48,7 +48,7 @@ const worker = new Worker(
 
             let pipeline = sharp(absoluteInputPath);
 
-            if (modelName === "User") {
+            if (modelName === "User" && fieldName !== "personalDetails.jathagam") {
                 pipeline = pipeline.resize(500, 500, { fit: "cover" });
             }
             // Add other models here when implemented
@@ -88,6 +88,11 @@ const worker = new Worker(
                 console.log(`[Worker][STEP 5] Mongo push update`);
                 await Model.findByIdAndUpdate(fileId, {
                     $push: { [fieldName]: storedPath },
+                });
+            } else if (operation === "unshift") {
+                console.log(`[Worker][STEP 5] Mongo unshift update`);
+                await Model.findByIdAndUpdate(fileId, {
+                    $push: { [fieldName]: { $each: [storedPath], $position: 0 } },
                 });
             } else {
                 console.log(`[Worker][STEP 5] Mongo replace update`);

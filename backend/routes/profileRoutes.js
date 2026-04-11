@@ -6,6 +6,11 @@ const { protect } = require("../middleware/authMiddleware");
 const {
     PersonalInfo,
     uploadProfilePicture,
+    uploadGalleryImage,
+    deleteGalleryImage,
+    uploadJathagam,
+    uploadChunk,
+    completeUpload
 } = require("../controllers/profileControllers");
 
 // --- MULTER CONFIGURATION ---
@@ -21,7 +26,11 @@ const storage = multer.diskStorage({
 });
 
 const fileFilter = (req, file, cb) => {
-    if (file.mimetype.startsWith("image/")) {
+    // Current mimetypes or common image extensions (for chunked blobs)
+    const isImage = file.mimetype.startsWith("image/");
+    const isImageExt = /\.(jpg|jpeg|png|webp)$/i.test(file.originalname);
+
+    if (isImage || isImageExt) {
         cb(null, true);
     } else {
         cb(new Error("Not an image! Please upload an image."), false);
@@ -43,8 +52,46 @@ router.put("/info", protect(), PersonalInfo);
 router.post(
     "/profile-image",
     protect(),
-    upload.single("image"), // Looks for form-data field named 'image'
+    upload.single("image"),
     uploadProfilePicture
+);
+
+// 3. Gallery Image Upload
+router.post(
+    "/gallery-image",
+    protect(),
+    upload.single("image"),
+    uploadGalleryImage
+);
+
+// 4. Delete Gallery Image
+router.delete(
+    "/gallery-image",
+    protect(),
+    deleteGalleryImage
+);
+
+// 5. Jathagam Upload
+router.post(
+    "/jathagam",
+    protect(),
+    upload.single("image"),
+    uploadJathagam
+);
+
+// 6. Chunk Upload
+router.post(
+    "/upload-chunk",
+    protect(),
+    upload.single("image"),
+    uploadChunk
+);
+
+// 7. Complete Upload
+router.post(
+    "/complete-upload",
+    protect(),
+    completeUpload
 );
 
 module.exports = router;
