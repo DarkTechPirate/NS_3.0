@@ -4,6 +4,13 @@ import Header from '../components/Header';
 import { useAuth } from '../context/AuthContext';
 import { getBackendBaseUrl } from '../utils/backendUrl';
 
+const getImageUrl = (path) => {
+  if (!path) return '';
+  if (path.startsWith('http') || path.startsWith('blob:')) return path;
+  const cleanPath = path.startsWith('/uploads') ? path : `/uploads/${path}`;
+  return `${import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000'}${cleanPath}`;
+};
+
 const ProfileView = () => {
     const { user } = useAuth();
     const backendBaseUrl = getBackendBaseUrl();
@@ -88,7 +95,7 @@ const ProfileView = () => {
                             <div className="w-40 h-40 rounded-full border-4 border-white shadow-md overflow-hidden bg-stone-100">
                                 {profileImages && profileImages.length > 0 ? (
                                     <img
-                                        src={profileImages[0].startsWith('http') ? profileImages[0] : `${backendBaseUrl}/uploads/${profileImages[0]}`}
+                                        src={getImageUrl(profileImages[0])}
                                         alt="Profile"
                                         className="w-full h-full object-cover"
                                     />
@@ -133,7 +140,7 @@ const ProfileView = () => {
                                     {profileImages.map((img, idx) => (
                                         <div key={idx} className="aspect-square rounded-xl overflow-hidden shadow-sm border border-stone-100">
                                             <img
-                                                src={img.startsWith('http') ? img : `${backendBaseUrl}/uploads/${img}`}
+                                                src={getImageUrl(img)}
                                                 alt={`Gallery ${idx}`}
                                                 className="w-full h-full object-cover hover:scale-105 transition-transform duration-500"
                                             />

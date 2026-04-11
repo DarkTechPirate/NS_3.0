@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import Logo from '../components/Logo';
 import Header from '../components/Header';
-import { uploadProfileImage, updateProfileInfo } from '../services/api';
+import { uploadProfileImage, uploadGalleryImage, deleteGalleryImage, uploadJathagam, uploadFileWithChunks } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { getProfileCompletionFromForm, isProfileComplete } from '../utils/profileCompletion';
 import { getBackendBaseUrl } from '../utils/backendUrl';
@@ -12,6 +12,8 @@ const ProfileCreation = () => {
   const navigate = useNavigate();
   const [activeSection, setActiveSection] = useState('personal');
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState({}); // { fieldName: progress }
+  const [previewImage, setPreviewImage] = useState(null); // Full size preview modal
   const [formData, setFormData] = useState({
     // Personal Overview
     firstName: '',
@@ -56,9 +58,11 @@ const ProfileCreation = () => {
     photos: []
   });
 
-  // Pre-fill form if user data exists
+  const [initUserRef, setInitUserRef] = useState(null);
+
+  // Pre-fill form ONLY when a user initially loads, avoiding a clobber when `setUser` updates locally
   React.useEffect(() => {
-    if (user) {
+    if (user && user._id !== initUserRef) {
       setFormData(prev => ({
         ...prev,
         // Root Fields
@@ -75,7 +79,7 @@ const ProfileCreation = () => {
         caste: user.personalDetails?.caste || '',
         motherTongue: user.personalDetails?.motherTongue || '',
         aboutText: user.personalDetails?.about || '',
-        currentCity: user.personalDetails?.city || user.addresses?.[0]?.city || '',
+        jathagam: user.personalDetails?.jathagam || null,
 
         // Career
         highestEducation: user.careerDetails?.education || '',
@@ -107,10 +111,11 @@ const ProfileCreation = () => {
         relocate: user.preferences?.relocate || false,
 
         // Photos
-        photos: user.profileImages || (user.profilePicture ? [user.profilePicture] : []),
+        photos: user.profileImages?.length ? user.profileImages : (user.profilePicture ? [user.profilePicture] : []),
       }));
+      setInitUserRef(user._id);
     }
-  }, [user]);
+  }, [user, initUserRef]);
 
   // Comprehensive Indian Religion, Community, and Caste Data
   const religions = [
@@ -232,6 +237,34 @@ const ProfileCreation = () => {
 
   const renderPersonalOverview = () => (
     <div className="space-y-10">
+      {/* Profile Picture Section */}
+      <div className="flex flex-col items-center justify-center space-y-4 pt-4">
+        <div className="relative group">
+            <div className="w-32 h-32 rounded-full border-4 border-white shadow-md overflow-hidden bg-stone-100 flex items-center justify-center">
+                {formData.photos.length > 0 ? (
+                    <AsyncImage src={getImageUrl(formData.photos[0])} alt="Profile" className="w-full h-full" />
+                ) : (
+                    <span className="material-symbols-outlined text-6xl text-stone-300">person</span>
+                )}
+            </div>
+            <label htmlFor="avatar-upload" className="absolute bottom-0 right-0 bg-rajkumari text-white p-2 rounded-full cursor-pointer shadow-lg hover:scale-110 transition-transform">
+                <span className="material-symbols-outlined text-sm">edit</span>
+            </label>
+            <input
+                type="file"
+                id="avatar-upload"
+                className="hidden"
+                accept="image/*"
+                onChange={handleAvatarUpload}
+                disabled={uploading}
+            />
+        </div>
+        <div className="text-center">
+            <h4 className="font-medium text-charcoal">Profile Picture</h4>
+            <p className="text-xs text-slate-grey mt-1">This will be your primary photo.</p>
+        </div>
+      </div>
+
       {/* Identity Section */}
       <div className="space-y-6">
         <h3 className="text-charcoal text-xl font-serif font-medium border-b border-subtle-border pb-2 flex items-center gap-2">
@@ -454,26 +487,63 @@ const ProfileCreation = () => {
           <h3 className="text-charcoal text-xl font-serif font-medium">Jathagam (Horoscope)</h3>
           <span className="text-xs text-slate-grey/60 mb-1">Image file (JPG, PNG, PDF)</span>
         </div>
-        <div className="bg-stone-50 border-2 border-dashed border-stone-200 rounded-xl p-8 text-center hover:border-rajkumari/40 hover:bg-rajkumari/5 transition-all cursor-pointer group">
+        <div className="bg-stone-50 border-2 border-dashed border-stone-200 rounded-xl p-8 text-center hover:border-rajkumari/40 hover:bg-rajkumari/5 transition-all cursor-pointer group relative">
           <input
             type="file"
             id="jathagam-upload"
             className="hidden"
             accept="image/*,.pdf"
-            onChange={(e) => handleInputChange('jathagam', e.target.files[0])}
+            onChange={handleJathagamUpload}
+            disabled={uploading}
           />
-          <label htmlFor="jathagam-upload" className="cursor-pointer">
+          <label htmlFor="jathagam-upload" className="cursor-pointer block">
             {formData.jathagam ? (
               <div className="flex flex-col items-center gap-3">
-                <span className="material-symbols-outlined text-4xl text-green-500">check_circle</span>
-                <p className="text-sm font-medium text-charcoal">{formData.jathagam.name}</p>
-                <p className="text-xs text-slate-grey">Click to replace</p>
+                {typeof formData.jathagam === 'string' && formData.jathagam.match(/\.(jpg|jpeg|png|webp)$/i) ? (
+                  <div 
+                    className="w-24 h-32 rounded border border-stone-200 overflow-hidden shadow-sm mb-2 relative group-hover:shadow-md transition-shadow"
+                    onClick={(e) => {
+                        e.preventDefault();
+                        setPreviewImage(formData.jathagam);
+                    }}
+                  >
+                    <img src={getImageUrl(formData.jathagam)} alt="Jathagam" className="w-full h-full object-cover" />
+                    <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                        <span className="material-symbols-outlined text-white">zoom_in</span>
+                    </div>
+                  </div>
+                ) : (
+                  <span className="material-symbols-outlined text-4xl text-green-500">check_circle</span>
+                )}
+                <p className="text-sm font-medium text-charcoal">
+                  {formData.jathagam ? 'Horoscope Uploaded' : 
+                   (uploadProgress.jathagam === 100 ? 'Processing...' : 'Uploading...')}
+                </p>
+                <p className="text-xs text-rajkumari font-bold underline decoration-rajkumari/30 group-hover:decoration-rajkumari transition-all">Click to Replace</p>
               </div>
             ) : (
               <div className="flex flex-col items-center gap-3">
                 <span className="material-symbols-outlined text-4xl text-stone-300 group-hover:text-rajkumari/60 transition-colors">upload_file</span>
                 <p className="text-sm font-medium text-charcoal">Upload Jathagam</p>
                 <p className="text-xs text-slate-grey">Click or drag & drop your horoscope image here</p>
+              </div>
+            )}
+            
+            {uploadProgress.jathagam !== undefined && (
+              <div className="absolute inset-x-8 bottom-4">
+                <div className="h-1.5 w-full bg-stone-200 rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-rajkumari transition-all duration-300 shadow-glow" 
+                    style={{ width: `${uploadProgress.jathagam}%` }}
+                  ></div>
+                </div>
+                <p className="text-[10px] text-rajkumari font-bold mt-1 text-right">{uploadProgress.jathagam}%</p>
+              </div>
+            )}
+
+            {uploading && uploadProgress.jathagam === undefined && (
+              <div className="absolute inset-0 bg-white/60 flex items-center justify-center rounded-xl">
+                <span className="w-8 h-8 border-3 border-rajkumari/30 border-t-rajkumari rounded-full animate-spin"></span>
               </div>
             )}
           </label>
@@ -815,52 +885,176 @@ const ProfileCreation = () => {
     </div>
   );
 
-  // Helper to resolve image URL
-  const getImageUrl = (path) => {
-    if (!path) return '';
-    if (path.startsWith('http') || path.startsWith('blob:')) return path;
-    return `${backendBaseUrl}/uploads/${path}`;
-  };
-
-  const handleImageUpload = async (e) => {
+  const handleAvatarUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
-    const maxImageSizeBytes = 15 * 1024 * 1024;
-    if (!file.type.startsWith('image/')) {
-      alert('Please upload a valid image file.');
-      e.target.value = '';
-      return;
-    }
-    if (file.size > maxImageSizeBytes) {
-      alert('Image size must be less than 15MB.');
-      e.target.value = '';
+    if (formData.photos.length >= 6) {
+      alert("Maximum 6 photos allowed. Please remove a photo from the gallery first.");
       return;
     }
 
     setUploading(true);
+    const fieldKey = `avatar-${Date.now()}`;
+    setUploadProgress(prev => ({ ...prev, [fieldKey]: 0 }));
+
     try {
-      const res = await uploadProfileImage(file);
-      // Backend returns { message, filePath } (e.g. user/filename.webp)
+      const res = await uploadFileWithChunks({
+        file,
+        fieldName: "profileImages",
+        operation: "unshift",
+        onProgress: (progress) => {
+          setUploadProgress(prev => ({ ...prev, [fieldKey]: progress }));
+        }
+      });
+
       if (res.filePath) {
-        // Store RELATIVE path in state/DB to keep data clean
         setFormData(prev => ({
           ...prev,
-          photos: [...prev.photos, res.filePath]
+          photos: [res.filePath, ...prev.photos] // Put at front as primary
         }));
-        // Update global user context for Header
+        
         if (user) {
           setUser({ ...user, profilePicture: res.filePath });
         }
       }
     } catch (err) {
       console.error("Upload failed", err);
-      const message = typeof err === 'string' ? err : err?.message || "Failed to upload image. Please try again.";
-      alert(message);
+      alert("Failed to upload profile picture.");
+    } finally {
+      setTimeout(() => setUploadProgress(prev => {
+        const next = { ...prev };
+        delete next[fieldKey];
+        return next;
+      }), 2000);
+      setUploading(false);
+      e.target.value = null;
+    }
+  };
+
+  const handleJathagamUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setUploading(true);
+    setUploadProgress(prev => ({ ...prev, jathagam: 0 }));
+
+    try {
+      const res = await uploadFileWithChunks({
+        file,
+        fieldName: "personalDetails.jathagam",
+        operation: "set",
+        onProgress: (progress) => {
+          setUploadProgress(prev => ({ ...prev, jathagam: progress }));
+        }
+      });
+
+      if (res.filePath) {
+        handleInputChange('jathagam', res.filePath);
+      }
+    } catch (err) {
+      console.error("Jathagam upload failed", err);
+      alert("Failed to upload Jathagam");
+    } finally {
+      setUploading(false);
+      // Keep progress at 100 for a moment then clear
+      setTimeout(() => setUploadProgress(prev => {
+        const next = { ...prev };
+        delete next.jathagam;
+        return next;
+      }), 2000);
+    }
+  };
+
+  const handleImageUpload = async (e) => {
+    const files = Array.from(e.target.files);
+    if (!files || files.length === 0) return;
+
+    if (formData.photos.length + files.length > 6) {
+      alert(`Maximum 6 photos allowed. You tried to add ${files.length} but only have space for ${6 - formData.photos.length}.`);
+      return;
+    }
+
+    setUploading(true);
+    
+    // Process multiple files sequentially
+    for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const fieldKey = `photo-${Date.now()}-${i}`;
+        setUploadProgress(prev => ({ ...prev, [fieldKey]: 0 }));
+
+        try {
+            const res = await uploadFileWithChunks({
+                file,
+                fieldName: "profileImages",
+                operation: "push",
+                onProgress: (progress) => {
+                    setUploadProgress(prev => ({ ...prev, [fieldKey]: progress }));
+                }
+            });
+
+            if (res.filePath) {
+                setFormData(prev => ({
+                    ...prev,
+                    photos: [...prev.photos, res.filePath]
+                }));
+                
+                if (formData.photos.length === 0 && i === 0 && user) {
+                    setUser({ ...user, profilePicture: res.filePath });
+                }
+            }
+        } catch (err) {
+            console.error("Upload failed", err);
+            alert(`Failed to upload ${file.name}`);
+        } finally {
+            setTimeout(() => setUploadProgress(prev => {
+                const next = { ...prev };
+                delete next[fieldKey];
+                return next;
+            }), 2000);
+        }
+    }
+    
+    setUploading(false);
+    // Clear file input cache to allow identical consecutive uploads gracefully
+    e.target.value = null;
+  };
+
+  const handleDeletePhoto = async (photoPath, index) => {
+    try {
+      setUploading(true);
+      await deleteGalleryImage(photoPath);
+      
+      setFormData(prev => ({
+        ...prev,
+        photos: prev.photos.filter((_, i) => i !== index)
+      }));
+
+      // If we deleted the profile picture, update user context
+      if (user && user.profilePicture === photoPath) {
+        // Pick the next available photo or null
+        const nextPhoto = formData.photos.find(p => p !== photoPath) || '';
+        setUser({ ...user, profilePicture: nextPhoto });
+      }
+    } catch (err) {
+      console.error("Delete failed", err);
+      alert("Failed to remove image");
     } finally {
       setUploading(false);
       e.target.value = '';
     }
+  };
+
+  const movePhoto = (index, direction) => {
+    if ((direction === -1 && index === 0) || (direction === 1 && index === formData.photos.length - 1)) return;
+    
+    setFormData(prev => {
+        const newPhotos = [...prev.photos];
+        const temp = newPhotos[index];
+        newPhotos[index] = newPhotos[index + direction];
+        newPhotos[index + direction] = temp;
+        return { ...prev, photos: newPhotos };
+    });
   };
 
   const renderVisualPortfolio = () => (
@@ -876,6 +1070,7 @@ const ProfileCreation = () => {
           id="profile-upload"
           className="hidden"
           accept="image/*"
+          multiple
           onChange={handleImageUpload}
           disabled={uploading}
         />
@@ -894,25 +1089,77 @@ const ProfileCreation = () => {
 
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
         {formData.photos.map((photo, index) => (
-          <div key={index} className="aspect-square rounded-xl border border-stone-200 bg-stone-50 overflow-hidden relative group">
-            <img src={getImageUrl(photo)} alt={`Profile ${index}`} className="w-full h-full object-cover" />
+          <div key={`${photo}-${index}`} className="aspect-square rounded-xl border border-stone-200 bg-stone-50 overflow-hidden relative group shadow-sm hover:shadow-md transition-all">
+            <AsyncImage 
+                src={getImageUrl(photo)} 
+                alt={`Profile ${index}`} 
+                className="w-full h-full cursor-zoom-in group-hover:scale-105 transition-transform duration-500" 
+                onClick={() => setPreviewImage(photo)}
+            />
+            <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 flex flex-col items-center justify-between p-2 transition-opacity pointer-events-none">
+                <span className="material-symbols-outlined text-white text-3xl mt-12">zoom_in</span>
+            </div>
+            
+            {/* Top Right: Delete */}
             <button
               type="button"
-              onClick={() => setFormData(prev => ({ ...prev, photos: prev.photos.filter((_, i) => i !== index) }))}
-              className="absolute top-2 right-2 bg-black/50 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+              onClick={(e) => { e.stopPropagation(); handleDeletePhoto(photo, index); }}
+              className="absolute top-2 right-2 bg-black/60 text-white rounded-full p-1.5 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-rajkumari z-10 flex items-center justify-center shadow-lg"
+              disabled={uploading}
+              title="Delete photo"
             >
-              <span className="material-symbols-outlined text-base">close</span>
+              <span className="material-symbols-outlined text-sm">delete</span>
             </button>
+            
+            {/* Bottom Controls: Reorder */}
+            <div className="absolute bottom-2 left-0 right-0 flex justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); movePhoto(index, -1); }}
+                  disabled={index === 0}
+                  className="bg-black/60 text-white rounded-full p-1 hover:bg-rajkumari disabled:opacity-30 disabled:hover:bg-black/60 transition-colors shadow-lg"
+                  title="Move Left"
+                >
+                    <span className="material-symbols-outlined text-sm">arrow_left</span>
+                </button>
+                <div className="bg-black/60 text-white px-2 rounded-full text-xs flex items-center">
+                    {index + 1}
+                </div>
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); movePhoto(index, 1); }}
+                  disabled={index === formData.photos.length - 1}
+                  className="bg-black/60 text-white rounded-full p-1 hover:bg-rajkumari disabled:opacity-30 disabled:hover:bg-black/60 transition-colors shadow-lg"
+                  title="Move Right"
+                >
+                    <span className="material-symbols-outlined text-sm">arrow_right</span>
+                </button>
+            </div>
           </div>
         ))}
-        {/* Placeholders for remaining slots */}
-        {[...Array(Math.max(0, 6 - formData.photos.length))].map((_, i) => (
+        {/* Progressing Slots */}
+        {Object.entries(uploadProgress).filter(([key]) => key.startsWith('photo-')).map(([key, progress]) => (
+          <div key={key} className="aspect-square rounded-xl border-2 border-rajkumari/30 bg-rajkumari/5 flex flex-col items-center justify-center p-4 relative overflow-hidden">
+             <span className="material-symbols-outlined text-rajkumari/30 animate-pulse text-4xl mb-2">image</span>
+             <div className="w-full space-y-2">
+                 <div className="h-1.5 w-full bg-stone-200 rounded-full overflow-hidden">
+                    <div 
+                        className="h-full bg-rajkumari transition-all duration-300" 
+                        style={{ width: `${progress}%` }}
+                    ></div>
+                 </div>
+                 <p className="text-[10px] text-rajkumari font-bold text-center">{progress}%</p>
+             </div>
+          </div>
+        ))}
+        {/* Placeholder Slots */}
+        {[...Array(Math.max(0, 6 - formData.photos.length - Object.keys(uploadProgress).filter(k => k.startsWith('photo-')).length))].map((_, i) => (
           <label
             key={`placeholder-${i}`}
             htmlFor="profile-upload"
             className="aspect-square rounded-xl border-2 border-dashed border-stone-200 bg-stone-50 flex items-center justify-center hover:border-rajkumari/50 hover:bg-rajkumari/5 transition-all cursor-pointer group"
           >
-            <span className="material-symbols-outlined text-3xl text-stone-300 group-hover:text-rajkumari/50">add</span>
+            <span className="material-symbols-outlined text-3xl text-stone-300 group-hover:text-rajkumari/50">add_a_photo</span>
           </label>
         ))}
       </div>
@@ -967,8 +1214,7 @@ const ProfileCreation = () => {
         caste: formData.caste,
         motherTongue: formData.motherTongue,
         about: formData.aboutText,
-        city: formData.currentCity,
-        // jathagam is handled separately via upload currently, or needs logic
+        jathagam: formData.jathagam,
       },
       careerDetails: {
         education: formData.highestEducation,
@@ -1000,6 +1246,7 @@ const ProfileCreation = () => {
         relocate: formData.relocate,
       },
       profileImages: formData.photos, // Array of URLs
+      profilePicture: formData.photos[0] || '', // Provide avatar sync
       fullName: `${formData.firstName} ${formData.lastName}`.trim(),
     };
   };
@@ -1008,23 +1255,20 @@ const ProfileCreation = () => {
     try {
       setUploading(true);
       const payload = getPayload();
-      const res = await updateProfileInfo(payload);
+      const res = await import('../services/api').then(mod => mod.updateProfileInfo(payload));
 
       if (res.success) {
-        const nextUser = res.user || user;
-
         if (res.user) {
-          setUser(res.user);
+           setUser(res.user);
         }
-
-        if (isDraft) {
-          alert('Draft saved successfully.');
-          return;
-        }
-
-        const currentIndex = sections.findIndex(s => s.id === activeSection);
-        if (currentIndex < sections.length - 1) {
-          setActiveSection(sections[currentIndex + 1].id);
+        
+        if (!isDraft) {
+          const currentIndex = sections.findIndex(s => s.id === activeSection);
+          if (currentIndex < sections.length - 1) {
+            setActiveSection(sections[currentIndex + 1].id);
+          } else {
+            navigate('/profile');
+          }
         } else {
           if (!isProfileComplete(nextUser)) {
             alert('Please complete all required fields and upload at least one photo before submitting.');
@@ -1046,14 +1290,10 @@ const ProfileCreation = () => {
 
   return (
     <div className="bg-ivory text-charcoal font-sans overflow-hidden h-screen flex flex-col antialiased">
-      {/* Header */}
       <Header />
-
       <div className="flex flex-1 h-full overflow-hidden">
-        {/* Sidebar */}
         <aside className="w-80 border-r border-subtle-border bg-stone-paper hidden lg:flex flex-col h-full overflow-y-auto p-8 relative">
           <div className="flex flex-col gap-8">
-            {/* Progress Card */}
             <div className="flex flex-col gap-3 p-5 rounded-2xl bg-white border border-subtle-border shadow-soft">
               <div className="flex gap-6 justify-between items-center">
                 <p className="text-charcoal text-base font-serif font-medium">Profile Status</p>
@@ -1064,8 +1304,6 @@ const ProfileCreation = () => {
               </div>
               <p className="text-slate-grey/80 text-xs">Authenticity attracts the right match.</p>
             </div>
-
-            {/* Navigation */}
             <nav className="flex flex-col gap-2">
               <div className="text-xs font-bold tracking-widest text-slate-grey/50 uppercase mb-2 pl-3">Sections</div>
               {sections.map((section) => (
@@ -1098,8 +1336,6 @@ const ProfileCreation = () => {
             <p className="text-xs text-slate-grey font-medium">Your data is encrypted and visible only to verified matches.</p>
           </div>
         </aside>
-
-        {/* Main Form */}
         <main className="flex-1 overflow-y-auto bg-ivory relative scroll-smooth">
           <div className="max-w-[800px] mx-auto px-6 py-10 pb-32">
             <div className="mb-12">
@@ -1117,13 +1353,10 @@ const ProfileCreation = () => {
                 {getSectionTitle().subtitle}
               </p>
             </div>
-
             <form className="flex flex-col gap-10" onSubmit={(e) => e.preventDefault()}>
               {renderActiveSection()}
             </form>
           </div>
-
-          {/* Fixed Bottom Actions */}
           <div className="fixed bottom-0 left-0 lg:left-80 right-0 bg-ivory/90 backdrop-blur-md border-t border-subtle-border p-6 flex justify-between items-center z-10 shadow-[0_-5px_20px_rgba(0,0,0,0.02)]">
             <button
               onClick={() => handleSave(true)}
@@ -1155,6 +1388,78 @@ const ProfileCreation = () => {
             </div>
           </div>
         </main>
+      </div>
+      <ImageModal src={previewImage} onClose={() => setPreviewImage(null)} />
+    </div>
+  );
+};
+
+const AsyncImage = ({ src, alt, className, onClick }) => {
+  const [imgSrc, setImgSrc] = useState(src);
+  const [loaded, setLoaded] = useState(false);
+  const [errorCount, setErrorCount] = useState(0);
+
+  // Use inline useEffect conceptually to resync src changes
+  React.useEffect(() => {
+    setImgSrc(src);
+    setLoaded(false);
+    setErrorCount(0);
+  }, [src]);
+
+  const handleError = () => {
+    if (errorCount < 10) {
+      setTimeout(() => {
+        setImgSrc(`${src}?t=${Date.now()}`);
+        setErrorCount(prev => prev + 1);
+      }, 1500); // Retry every 1.5s as backend processes
+    }
+  };
+
+  return (
+    <div className={`relative ${className} bg-stone-100 flex items-center justify-center`} onClick={onClick}>
+      {!loaded && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center text-rajkumari/40">
+          <span className="material-symbols-outlined animate-pulse text-4xl mb-2">image</span>
+          {errorCount > 0 && <span className="text-[10px] animate-pulse">Processing...</span>}
+        </div>
+      )}
+      <img
+        src={imgSrc}
+        alt={alt}
+        className={`w-full h-full object-cover transition-opacity duration-500 ${loaded ? 'opacity-100' : 'opacity-0'}`}
+        onLoad={() => setLoaded(true)}
+        onError={handleError}
+      />
+    </div>
+  );
+};
+
+const getImageUrl = (path) => {
+  if (!path) return '';
+  if (path.startsWith('http') || path.startsWith('blob:')) return path;
+  return `${import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000'}/uploads/${path}`;
+};
+
+const ImageModal = ({ src, onClose }) => {
+  if (!src) return null;
+  return (
+    <div 
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-sm p-4 animate-in fade-in duration-300"
+      onClick={onClose}
+    >
+      <button 
+        className="absolute top-6 right-6 text-white bg-white/20 hover:bg-white/40 rounded-full p-2 transition-all group"
+        onClick={onClose}
+      >
+        <span className="material-symbols-outlined text-3xl">close</span>
+      </button>
+      <div className="relative max-w-5xl max-h-[90vh] overflow-hidden rounded-2xl shadow-2xl animate-in zoom-in-95 duration-300">
+        <img 
+          src={getImageUrl(src)} 
+          alt="Full size preview" 
+          className="w-full h-full object-contain"
+          onClick={(e) => e.stopPropagation()}
+        />
       </div>
     </div>
   );

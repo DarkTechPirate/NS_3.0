@@ -86,6 +86,95 @@ export const uploadProfileImage = async (file) => {
     }
 };
 
+export const uploadGalleryImage = async (file) => {
+    try {
+        const formData = new FormData();
+        formData.append('image', file);
+        const response = await api.post('/profile/gallery-image', formData, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+        });
+        return response.data;
+    } catch (error) {
+        throw error.response?.data?.message || 'Upload failed';
+    }
+};
+
+export const deleteGalleryImage = async (imagePath) => {
+    try {
+        const response = await api.delete('/profile/gallery-image', {
+            data: { imagePath }
+        });
+        return response.data;
+    } catch (error) {
+        throw error.response?.data?.message || 'Delete failed';
+    }
+};
+
+export const uploadJathagam = async (file) => {
+    try {
+        const formData = new FormData();
+        formData.append('image', file);
+        const response = await api.post('/profile/jathagam', formData, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+        });
+        return response.data;
+    } catch (error) {
+        throw error.response?.data?.message || 'Upload failed';
+    }
+};
+
+// --- NEW: Chunked Upload Implementation ---
+export const uploadFileWithChunks = async ({
+    file,
+    modelName = "User",
+    fieldName = "profileImages",
+    operation = "push",
+    onProgress = () => {}
+}) => {
+    console.log(`Starting chunked upload for ${file.name} to ${fieldName}`);
+    const CHUNK_SIZE = 1024 * 1024; // 1MB chunks
+    const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+    const uploadId = `${Date.now()}-${file.name.replace(/\s+/g, "_")}`;
+
+    for (let i = 0; i < totalChunks; i++) {
+        const start = i * CHUNK_SIZE;
+        const end = Math.min(file.size, start + CHUNK_SIZE);
+        const chunk = file.slice(start, end);
+
+        const formData = new FormData();
+        formData.append("image", chunk, file.name);
+        formData.append("chunkNumber", i);
+        formData.append("totalChunks", totalChunks);
+        formData.append("uploadId", uploadId);
+
+        try {
+            await api.post("/profile/upload-chunk", formData, {
+                headers: { "Content-Type": "multipart/form-data" },
+            });
+            console.log(`Chunk ${i} uploaded successfully`);
+        } catch (err) {
+            console.error(`Chunk ${i} upload failed`, err);
+            throw err;
+        }
+
+        // Report progress
+        const percentCompleted = Math.round(((i + 1) / totalChunks) * 90); // 90% is chunks, 10% is completion
+        onProgress(percentCompleted);
+    }
+
+    console.log(`Completing upload for ${uploadId}`);
+    const response = await api.post("/profile/complete-upload", {
+        uploadId,
+        fileName: file.name,
+        modelName,
+        fieldName,
+        operation
+    });
+
+    onProgress(100);
+    return response.data;
+};
+
 // Match API Calls
 export const getMatches = async (filters = {}) => {
     try {

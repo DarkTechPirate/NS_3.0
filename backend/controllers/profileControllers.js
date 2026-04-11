@@ -1,6 +1,10 @@
 const User = require("../models/userModel");
 const bcrypt = require("bcryptjs");
 const { enqueueMedia } = require("../services/mediaService");
+const minio = require("../config/minio");
+const path = require("path");
+const fs = require("fs");
+const mime = require("mime-types");
 
 // --- Helper: Indian Phone Validator ---
 const isValidIndianPhone = (phone) => {
@@ -55,6 +59,11 @@ exports.PersonalInfo = async (req, res) => {
                 }
             }
         });
+
+        // Profile Picture Update
+        if (req.body.profilePicture) {
+            user.profilePicture = req.body.profilePicture;
+        }
 
         // Indian Phone Validation
         if (phone) {
@@ -112,23 +121,8 @@ exports.uploadProfilePicture = async (req, res) => {
                 .json({ success: false, message: "No image uploaded" });
         }
 
-        const useMinio = process.env.USE_MINIO === "true";
-
-        if (useMinio) {
-            // Add Job to Queue and get anticipated path
-            const publicPath = await enqueueMedia(
-                req.file,
-                req.user._id,
-                "User",
-                "profilePicture"
-            );
-
-            return res.status(200).json({
-                success: true,
-                message: "Profile picture processing started",
-                filePath: publicPath.replace(/^\/uploads\//, ""),
-            });
-        }
+        // Add Job to Queue and get anticipated path
+        const publicPath = await enqueueMedia(req.file, req.user._id, "User", "profilePicture", "set");
 
         // Local filesystem mode: immediately persist and return relative path.
         const relativePath = req.file.filename;
@@ -136,11 +130,155 @@ exports.uploadProfilePicture = async (req, res) => {
 
         return res.status(200).json({
             success: true,
-            message: "Profile picture uploaded successfully",
-            filePath: relativePath,
+            message: "Profile picture processing started",
+            filePath: publicPath.replace(/^\/uploads\//, ""),
         });
     } catch (error) {
         console.error("Profile Upload Error:", error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+// --- 3. NEW: Gallery Image Upload ---
+exports.uploadGalleryImage = async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ success: false, message: "No image uploaded" });
+        }
+
+        // Add Job to Queue with 'push' operation
+        const publicPath = await enqueueMedia(req.file, req.user._id, "User", "profileImages", "push");
+
+        res.status(200).json({
+            success: true,
+            message: "Gallery image processing started",
+            filePath: publicPath.replace(/^\/uploads\//, ""),
+        });
+    } catch (error) {
+        console.error("Gallery Upload Error:", error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+// --- 4. NEW: Delete Gallery Image ---
+exports.deleteGalleryImage = async (req, res) => {
+    try {
+        const { imagePath } = req.body;
+        const userId = req.user._id;
+
+        if (!imagePath) {
+            return res.status(400).json({ success: false, message: "Image path is required" });
+        }
+
+        // 1. Remove from User array in DB
+        // imagePath is like "user/filename.webp"
+        const storedPath = `/uploads/${imagePath}`;
+        await User.findByIdAndUpdate(userId, {
+            $pull: { profileImages: storedPath }
+        });
+
+        // 2. Delete from Storage (MinIO)
+        const BUCKET = process.env.MINIO_BUCKET_NAME || "nammasambandi";
+        try {
+            await minio.removeObject(BUCKET, imagePath);
+            console.log(`Deleted ${imagePath} from MinIO`);
+        } catch (e) {
+            console.warn(`MinIO delete failed (likely file not found): ${e.message}`);
+        }
+
+        res.status(200).json({ success: true, message: "Image removed successfully" });
+    } catch (error) {
+        console.error("Delete Gallery Image Error:", error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+// --- 5. NEW: Jathagam Upload ---
+exports.uploadJathagam = async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ success: false, message: "No file uploaded" });
+        }
+
+        // Add Job to Queue
+        const publicPath = await enqueueMedia(req.file, req.user._id, "User", "personalDetails.jathagam", "set");
+
+        res.status(200).json({
+            success: true,
+            message: "Jathagam processing started",
+            filePath: publicPath.replace(/^\/uploads\//, ""),
+        });
+    } catch (error) {
+        console.error("Jathagam Upload Error:", error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+// --- 6. NEW: Chunk Upload ---
+exports.uploadChunk = async (req, res) => {
+    try {
+        const { chunkNumber, totalChunks, uploadId } = req.body;
+        if (!req.file) return res.status(400).send("No chunk file");
+
+        const tempDir = path.join("public/uploads/temp", uploadId);
+        if (!fs.existsSync(tempDir)) {
+            fs.mkdirSync(tempDir, { recursive: true });
+        }
+
+        const chunkPath = path.join(tempDir, `chunk-${chunkNumber}`);
+        try {
+            fs.copyFileSync(req.file.path, chunkPath);
+            fs.unlinkSync(req.file.path);
+        } catch (e) {
+            fs.renameSync(req.file.path, chunkPath); // Fallback
+        }
+
+        res.status(200).json({ success: true, message: `Chunk ${chunkNumber} received` });
+    } catch (error) {
+        console.error("Chunk Upload Error:", error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+// --- 7. NEW: Complete Chunked Upload ---
+exports.completeUpload = async (req, res) => {
+    try {
+        const { uploadId, fileName, modelName, fieldName, operation } = req.body;
+        const tempDir = path.join("public/uploads/temp", uploadId);
+        const finalPath = path.join("public/uploads", `${uploadId}-${fileName}`);
+
+        const chunks = fs.readdirSync(tempDir).sort((a, b) => {
+            return parseInt(a.split("-")[1]) - parseInt(b.split("-")[1]);
+        });
+
+        const writeStream = fs.createWriteStream(finalPath);
+        for (const chunk of chunks) {
+            const chunkPath = path.join(tempDir, chunk);
+            const chunkData = fs.readFileSync(chunkPath);
+            writeStream.write(chunkData);
+            fs.unlinkSync(chunkPath); // Delete chunk after writing
+        }
+        writeStream.end();
+
+        // Wait for streaming to finish
+        await new Promise((resolve) => writeStream.on("finish", resolve));
+        fs.rmdirSync(tempDir); // Remove temp folder
+
+        // Trigger processing
+        const fakeFile = {
+            path: finalPath,
+            mimetype: mime.lookup(finalPath) || "image/webp",
+        };
+
+        const publicPath = await enqueueMedia(fakeFile, req.user._id, modelName || "User", fieldName, operation || "set");
+
+        res.status(200).json({
+            success: true,
+            filePath: publicPath.replace(/^\/uploads\//, ""),
+            message: "Upload completed and processing started",
+        });
+    } catch (error) {
+        console.error("Complete Upload Error:", error);
         res.status(500).json({ success: false, message: error.message });
     }
 };
