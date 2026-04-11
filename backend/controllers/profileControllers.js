@@ -171,10 +171,9 @@ exports.deleteGalleryImage = async (req, res) => {
         }
 
         // 1. Remove from User array in DB
-        // imagePath is like "user/filename.webp"
-        const storedPath = `/uploads/${imagePath}`;
+        // Support pulling both legacy '/uploads/user/...' and new 'user/...' formats
         await User.findByIdAndUpdate(userId, {
-            $pull: { profileImages: storedPath }
+            $pull: { profileImages: { $in: [imagePath, `/uploads/${imagePath}`] } }
         });
 
         // 2. Delete from Storage (MinIO)

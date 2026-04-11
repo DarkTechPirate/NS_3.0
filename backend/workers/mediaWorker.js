@@ -79,7 +79,7 @@ const worker = new Worker(
             console.log(`[Worker][STEP 4] MinIO upload DONE`);
 
             // ---------- STEP 5: DB update ----------
-            const storedPath = `/uploads/${objectKey}`;
+            const storedPath = objectKey;
             console.log(`[Worker][STEP 5] Stored path: ${storedPath}`);
 
             const Model = mongoose.model(modelName);
