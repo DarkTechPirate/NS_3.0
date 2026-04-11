@@ -7,8 +7,10 @@ import { getBackendBaseUrl } from '../utils/backendUrl';
 const getImageUrl = (path) => {
   if (!path) return '';
   if (path.startsWith('http') || path.startsWith('blob:')) return path;
-  const cleanPath = path.startsWith('/uploads') ? path : `/uploads/${path}`;
-  return `${import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000'}${cleanPath}`;
+  
+  // Clean the path: remove leading /uploads/ if it exists from DB to avoid doubling
+  const cleanPath = path.replace(/^\/?uploads\//, "");
+  return `${import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000'}/uploads/${cleanPath}`;
 };
 
 const ProfileView = () => {

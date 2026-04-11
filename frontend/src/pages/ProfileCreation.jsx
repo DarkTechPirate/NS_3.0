@@ -1437,7 +1437,10 @@ const AsyncImage = ({ src, alt, className, onClick }) => {
 const getImageUrl = (path) => {
   if (!path) return '';
   if (path.startsWith('http') || path.startsWith('blob:')) return path;
-  return `${import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000'}/uploads/${path}`;
+  
+  // Clean the path: remove leading /uploads/ if it exists from DB to avoid doubling
+  const cleanPath = path.replace(/^\/?uploads\//, "");
+  return `${import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000'}/uploads/${cleanPath}`;
 };
 
 const ImageModal = ({ src, onClose }) => {

@@ -71,7 +71,10 @@ app.get(/^\/uploads\/(.+)$/, async (req, res, next) => {
     return next();
   }
 
-  const objectName = req.params[0]; // e.g. user/filename.webp
+  let objectName = req.params[0]; // e.g. user/filename.webp
+  
+  // Robustness: Strip leading /uploads/ if it somehow got into the captured group (e.g. double slash URLs)
+  objectName = objectName.replace(/^\/?uploads\//, "");
 
   try {
     // Ensure object exists

@@ -72,10 +72,9 @@ const Header = ({ variant = 'default' }) => {
   const isActive = (path) => location.pathname === path;
 
   // Image URL Logic
-  // Image URL Logic
   const BACKEND_URL = getBackendBaseUrl();
   const userImage = user?.profilePicture ?
-    (user.profilePicture.startsWith('http') ? user.profilePicture : `${BACKEND_URL}/uploads/${user.profilePicture}`)
+    (user.profilePicture.startsWith('http') ? user.profilePicture : `${BACKEND_URL}/uploads/${user.profilePicture.replace(/^\/?uploads\//, "")}`)
     : null;
 
   return (
