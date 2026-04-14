@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import Logo from '../components/Logo';
 import Header from '../components/Header';
-import { uploadProfileImage, uploadGalleryImage, deleteGalleryImage, uploadJathagam, uploadFileWithChunks } from '../services/api';
+import { deleteGalleryImage, updateProfileInfo, uploadFileWithChunks } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { getProfileCompletionFromForm, isProfileComplete } from '../utils/profileCompletion';
 import { getBackendBaseUrl } from '../utils/backendUrl';
@@ -117,6 +117,12 @@ const ProfileCreation = () => {
     }
   }, [user, initUserRef]);
 
+  React.useEffect(() => {
+    if (user && isProfileComplete(user)) {
+      navigate('/dashboard', { replace: true });
+    }
+  }, [user, navigate]);
+
   // Comprehensive Indian Religion, Community, and Caste Data
   const religions = [
     'Hindu',
@@ -217,22 +223,23 @@ const ProfileCreation = () => {
     { id: 'personal', label: 'Personal Overview', icon: 'person', status: 'in-progress' },
     { id: 'education', label: 'Education & Career', icon: 'school', status: 'required' },
     { id: 'family', label: 'Family Background', icon: 'diversity_3', status: 'required' },
-    { id: 'values', label: 'Values & Lifestyle', icon: 'favorite', status: 'optional' },
+    { id: 'values', label: 'Values & Lifestyle', icon: 'favorite', status: 'required' },
     { id: 'portfolio', label: 'Visual Portfolio', icon: 'photo_library', status: 'pending' }
   ];
   const completionProgress = getProfileCompletionFromForm(formData);
 
   const handleInputChange = (field, value) => {
-    setFormData({ ...formData, [field]: value });
+    setFormData((prev) => {
+      if (field === 'religion') {
+        return { ...prev, religion: value, community: '', caste: '' };
+      }
 
-    // Reset dependent fields when religion changes
-    if (field === 'religion') {
-      setFormData({ ...formData, religion: value, community: '', caste: '' });
-    }
-    // Reset caste when community changes
-    if (field === 'community') {
-      setFormData({ ...formData, community: value, caste: '' });
-    }
+      if (field === 'community') {
+        return { ...prev, community: value, caste: '' };
+      }
+
+      return { ...prev, [field]: value };
+    });
   };
 
   const renderPersonalOverview = () => (
@@ -1041,7 +1048,6 @@ const ProfileCreation = () => {
       alert("Failed to remove image");
     } finally {
       setUploading(false);
-      e.target.value = '';
     }
   };
 
@@ -1195,7 +1201,7 @@ const ProfileCreation = () => {
       case 'personal': return { step: 'Step 1 of 5', title: "Let's start with the basics.", subtitle: "Share your story with clarity and intent. We curate matches based on deep compatibility, so authenticity here is your greatest asset." };
       case 'education': return { step: 'Step 2 of 5', title: "Your education & career.", subtitle: "Help us understand your professional journey. This information is valued by families during the match review." };
       case 'family': return { step: 'Step 3 of 5', title: "Tell us about your family.", subtitle: "Family plays an important role in Indian marriages. Share details that help families connect." };
-      case 'values': return { step: 'Step 4 of 5 (Optional)', title: "Your values & lifestyle.", subtitle: "What matters most to you? Help us find someone who shares your outlook on life." };
+      case 'values': return { step: 'Step 4 of 5', title: "Your values & lifestyle.", subtitle: "This section is required so we can match you with people who align with your day-to-day preferences." };
       case 'portfolio': return { step: 'Step 5 of 5', title: "Show who you are.", subtitle: "A picture is worth a thousand words. Add photos that capture your personality." };
       default: return { step: 'Step 1 of 5', title: "Let's start with the basics.", subtitle: "" };
     }
@@ -1208,6 +1214,7 @@ const ProfileCreation = () => {
       personalDetails: {
         dob: formData.dateOfBirth,
         height: formData.height,
+        city: formData.currentCity,
         maritalStatus: formData.maritalStatus,
         religion: formData.religion,
         community: formData.community,
@@ -1255,28 +1262,63 @@ const ProfileCreation = () => {
     try {
       setUploading(true);
       const payload = getPayload();
-      const res = await import('../services/api').then(mod => mod.updateProfileInfo(payload));
+      const res = await updateProfileInfo(payload);
 
       if (res.success) {
-        if (res.user) {
-           setUser(res.user);
-        }
-        
-        if (!isDraft) {
-          const currentIndex = sections.findIndex(s => s.id === activeSection);
-          if (currentIndex < sections.length - 1) {
-            setActiveSection(sections[currentIndex + 1].id);
-          } else {
-            navigate('/profile');
-          }
-        } else {
-          if (!isProfileComplete(nextUser)) {
-            alert('Please complete all required fields and upload at least one photo before submitting.');
-            return;
-          }
+        const nextUser = res.user || {
+          ...user,
+          fullname: payload.fullName,
+          gender: payload.gender,
+          personalDetails: {
+            ...(user?.personalDetails || {}),
+            ...payload.personalDetails,
+          },
+          careerDetails: {
+            ...(user?.careerDetails || {}),
+            ...payload.careerDetails,
+          },
+          familyDetails: {
+            ...(user?.familyDetails || {}),
+            ...payload.familyDetails,
+          },
+          lifestyleDetails: {
+            ...(user?.lifestyleDetails || {}),
+            ...payload.lifestyleDetails,
+          },
+          preferences: {
+            ...(user?.preferences || {}),
+            ...payload.preferences,
+          },
+          profileImages: payload.profileImages,
+          profilePicture: payload.profilePicture,
+        };
 
-          navigate('/profile');
+        setUser(nextUser);
+
+        if (isDraft) {
+          alert('Draft saved successfully.');
+          return;
         }
+
+        const currentIndex = sections.findIndex((s) => s.id === activeSection);
+        const isLastSection = currentIndex === sections.length - 1;
+
+        if (!isLastSection) {
+          setActiveSection(sections[currentIndex + 1].id);
+          return;
+        }
+
+        if (!isProfileComplete(nextUser)) {
+          alert('Please complete all required sections, including Lifestyle and at least one photo, before submitting.');
+          if (!nextUser.lifestyleDetails?.diet || !nextUser.lifestyleDetails?.drinking || !nextUser.lifestyleDetails?.smoking || !nextUser.lifestyleDetails?.livingArrangement) {
+            setActiveSection('values');
+          } else {
+            setActiveSection('portfolio');
+          }
+          return;
+        }
+
+        navigate('/dashboard', { replace: true });
       } else {
         alert("Failed to save: " + res.message);
       }
@@ -1322,9 +1364,6 @@ const ProfileCreation = () => {
                       }`}>{section.label}</span>
                     {section.id === 'personal' && activeSection === 'personal' && (
                       <span className="text-ghee text-[10px] font-bold uppercase tracking-wide">In Progress</span>
-                    )}
-                    {section.id === 'values' && (
-                      <span className="text-stone-400 text-[10px] font-medium uppercase tracking-wide">Optional</span>
                     )}
                   </div>
                 </button>

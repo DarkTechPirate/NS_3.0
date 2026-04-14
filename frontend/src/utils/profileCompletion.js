@@ -11,6 +11,7 @@ const getRequiredValuesFromUser = (user) => {
     const personal = user.personalDetails || {};
     const career = user.careerDetails || {};
     const family = user.familyDetails || {};
+    const lifestyle = user.lifestyleDetails || {};
     const images = Array.isArray(user.profileImages) && user.profileImages.length > 0
         ? user.profileImages
         : (user.profilePicture ? [user.profilePicture] : []);
@@ -28,6 +29,10 @@ const getRequiredValuesFromUser = (user) => {
         family.fatherName,
         family.motherName,
         family.familyType,
+        lifestyle.diet,
+        lifestyle.drinking,
+        lifestyle.smoking,
+        lifestyle.livingArrangement,
         images,
     ];
 };
@@ -48,6 +53,10 @@ const getRequiredValuesFromForm = (formData) => {
         formData.fatherName,
         formData.motherName,
         formData.familyType,
+        formData.dietPreference,
+        formData.drinkingHabit,
+        formData.smokingHabit,
+        formData.livingArrangement,
         formData.photos,
     ];
 };
