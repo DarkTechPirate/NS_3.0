@@ -27,6 +27,18 @@ const MatchSchema = new mongoose.Schema({
     type: Boolean,
     default: false,
   },
+  visibleInCycle: {
+    type: Boolean,
+    default: false,
+  },
+  cycleKey: {
+    type: String,
+    default: null,
+  },
+  lastShownAt: {
+    type: Date,
+    default: null,
+  },
 }, {
   timestamps: true,
 });

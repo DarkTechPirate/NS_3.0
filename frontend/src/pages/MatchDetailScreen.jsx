@@ -4,8 +4,10 @@ import Logo from '../components/Logo';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import { getMatchDetail, expressInterest } from '../services/api';
+import { useAuth } from '../context/AuthContext';
 
 const MatchDetailScreen = () => {
+  const { user } = useAuth();
   const location = useLocation();
   const queryParams = new URLSearchParams(location.search);
   const userId = queryParams.get('id');

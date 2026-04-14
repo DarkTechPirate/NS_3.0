@@ -2,6 +2,12 @@ const Match = require("../models/Match");
 const Notification = require("../models/Notification");
 const socketService = require("../services/socketService");
 const mongoose = require("mongoose");
+const {
+    generateVisibleMatchesForUser,
+    getCycleKey,
+    getNextRefreshAt,
+    MATCH_CONFIG,
+} = require("../services/matchEngine");
 
 /**
  * @desc Get all matches for a user with optional filtering
@@ -13,10 +19,17 @@ exports.getMatches = async (req, res) => {
         const userId = req.user._id;
         const { community, education, location, diet, familyType } = req.query;
 
+        const now = new Date();
+        await generateVisibleMatchesForUser(userId, { now });
+
+        const cycleKey = getCycleKey(now);
+
         // Build filtering for the matched user's details
         const matchFilter = {
             user: new mongoose.Types.ObjectId(userId),
-            isDeleted: false
+            isDeleted: false,
+            visibleInCycle: true,
+            cycleKey,
         };
 
         // Aggregation to join with user details and filter
@@ -61,13 +74,21 @@ exports.getMatches = async (req, res) => {
 
         // Sort by score descending
         pipeline.push({ $sort: { score: -1 } });
+        pipeline.push({ $limit: MATCH_CONFIG.MAX_VISIBLE_MATCHES });
 
         const matches = await Match.aggregate(pipeline);
 
         res.status(200).json({
             success: true,
             count: matches.length,
-            data: matches
+            data: matches,
+            rotation: {
+                cycleKey,
+                nextRefreshAt: getNextRefreshAt(now).toISOString(),
+                intervalMinutes: MATCH_CONFIG.ROTATION_MINUTES,
+                maxVisible: MATCH_CONFIG.MAX_VISIBLE_MATCHES,
+                noRepeatDays: MATCH_CONFIG.NO_REPEAT_DAYS,
+            },
         });
     } catch (error) {
         console.error(`[MatchController] getMatches Error: ${error.message}`);
@@ -123,12 +144,19 @@ exports.getMatchDetail = async (req, res) => {
     try {
         const { userId } = req.params;
         const requesterId = req.user._id;
+        const now = new Date();
 
-        // Verify that a match exists
+        await generateVisibleMatchesForUser(requesterId, { now });
+
+        const cycleKey = getCycleKey(now);
+
+        // Only allow detail view for the currently visible rotating set.
         const match = await Match.findOne({ 
             user: requesterId, 
             matchedUser: userId,
-            isDeleted: false 
+            isDeleted: false,
+            visibleInCycle: true,
+            cycleKey,
         }).populate("matchedUser");
 
         if (!match) {

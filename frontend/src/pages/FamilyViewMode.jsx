@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import Logo from '../components/Logo';
 import Header from '../components/Header';
@@ -16,6 +16,7 @@ const FamilyViewMode = () => {
   const [matches, setMatches] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [rotationInfo, setRotationInfo] = useState(null);
   const [filters, setFilters] = useState({
     community: '',
     education: '',
@@ -24,22 +25,35 @@ const FamilyViewMode = () => {
     diet: ''
   });
 
-  useEffect(() => {
-    fetchMatches();
-  }, [filters]);
-
-  const fetchMatches = async () => {
+  const fetchMatches = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
       const res = await getMatches(filters);
-      setMatches(res.data);
+      setMatches(res.data || []);
+      setRotationInfo(res.rotation || null);
     } catch (err) {
       setError(err.message || "Failed to fetch matches");
       console.error("Failed to fetch matches", err);
     } finally {
       setLoading(false);
     }
+  }, [filters]);
+
+  useEffect(() => {
+    fetchMatches();
+    const intervalId = setInterval(fetchMatches, 60 * 1000);
+
+    return () => clearInterval(intervalId);
+  }, [fetchMatches]);
+
+  const getNextRefreshTime = () => {
+    if (!rotationInfo?.nextRefreshAt) return null;
+
+    return new Date(rotationInfo.nextRefreshAt).toLocaleTimeString([], {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
   };
 
   const updateFamilyReview = async (id, data) => {
@@ -109,8 +123,12 @@ const FamilyViewMode = () => {
              <span className="material-symbols-outlined">filter_list</span>
              {showFilters ? 'Hide Filters' : 'Show Filters'}
            </button>
-           <div className="text-sm text-stone-400">
-             {matches.length} matches found
+           <div className="text-sm text-stone-400 text-right">
+             <div>{matches.length} matches found</div>
+             <div>
+               Refreshes every {rotationInfo?.intervalMinutes || 1} min
+               {getNextRefreshTime() ? ` (next: ${getNextRefreshTime()})` : ''}
+             </div>
            </div>
         </div>
       </div>

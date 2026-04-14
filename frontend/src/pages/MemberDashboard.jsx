@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
@@ -10,37 +10,36 @@ const MemberDashboard = () => {
   const [matches, setMatches] = useState([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(null);
+  const [declinedMatches, setDeclinedMatches] = useState([]);
+  const [rotationInfo, setRotationInfo] = useState(null);
 
-  useEffect(() => {
-    fetchMatchesData();
-  }, []);
-
-  const fetchMatchesData = async () => {
+  const fetchMatchesData = useCallback(async () => {
     try {
       setLoading(true);
       const res = await getMatches();
       // Match controller returns { success: true, data: [...] }
-      setMatches(res.data);
+      setMatches(res.data || []);
+      setRotationInfo(res.rotation || null);
+      setDeclinedMatches((prev) => prev.filter((id) => (res.data || []).some((m) => m._id === id)));
     } catch (error) {
       console.error("Error fetching matches:", error);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    fetchMatchesData();
+    const intervalId = setInterval(fetchMatchesData, 60 * 1000);
+
+    return () => clearInterval(intervalId);
+  }, [fetchMatchesData]);
 
   const visibleMatches = matches.filter(m => !declinedMatches.includes(m._id));
   const remainingCount = visibleMatches.length;
 
   const handleDecline = async (id) => {
-    setMatches(prev => prev.map(m => m.id === id ? { ...m, status: 'declined' } : m));
-    await declineMatchApi(id);
-  };
-
-  const handleInterest = async (id) => {
-    const res = await expressInterest(id);
-    if (res.success) {
-      setMatches(prev => prev.map(m => m.id === id ? { ...m, status: res.status } : m));
-    }
+    setDeclinedMatches((prev) => (prev.includes(id) ? prev : [...prev, id]));
   };
 
   const handleExpressInterest = async (matchId) => {
@@ -69,6 +68,15 @@ const MemberDashboard = () => {
     const now = new Date();
     const options = { month: 'short', day: 'numeric' };
     return now.toLocaleDateString('en-US', options);
+  };
+
+  const getNextRefreshTime = () => {
+    if (!rotationInfo?.nextRefreshAt) return null;
+
+    return new Date(rotationInfo.nextRefreshAt).toLocaleTimeString([], {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
   };
 
   if (loading) {
@@ -100,6 +108,13 @@ const MemberDashboard = () => {
             <div className="flex items-center gap-2 text-sm text-stone-400">
               <span className="material-symbols-outlined text-base">group</span>
               <span>{remainingCount} {remainingCount === 1 ? 'match' : 'matches'} remaining</span>
+            </div>
+            <div className="flex items-center gap-2 text-sm text-stone-400">
+              <span className="material-symbols-outlined text-base">schedule</span>
+              <span>
+                Refreshes every {rotationInfo?.intervalMinutes || 1} min
+                {getNextRefreshTime() ? ` (next: ${getNextRefreshTime()})` : ''}
+              </span>
             </div>
           </div>
         </div>

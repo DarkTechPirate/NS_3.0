@@ -1,6 +1,69 @@
 const User = require('../models/userModel');
 const Match = require('../models/Match');
 
+const MAX_VISIBLE_MATCHES = Math.max(1, Number(process.env.MATCH_MAX_VISIBLE || 3));
+const NO_REPEAT_DAYS = Math.max(1, Number(process.env.MATCH_NO_REPEAT_DAYS || 7));
+const ROTATION_MINUTES = Math.max(1, Number(process.env.MATCH_ROTATION_MINUTES || 1));
+const MIN_MATCH_SCORE = Math.max(0, Number(process.env.MATCH_MIN_SCORE || 30));
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+const MINUTE_MS = 60 * 1000;
+
+const COMPATIBILITY_RANK = {
+  Strong: 3,
+  Moderate: 2,
+  Developing: 1,
+};
+
+const getRotationWindowMs = () => ROTATION_MINUTES * MINUTE_MS;
+
+const getCycleKey = (at = new Date()) => `cycle-${Math.floor(at.getTime() / getRotationWindowMs())}`;
+
+const getNextRefreshAt = (at = new Date()) => {
+  const windowMs = getRotationWindowMs();
+  return new Date(Math.ceil((at.getTime() + 1) / windowMs) * windowMs);
+};
+
+const normalizeString = (value) => (typeof value === 'string' ? value.trim().toLowerCase() : '');
+
+const toOppositeGender = (gender) => {
+  if (gender === 'Male') return 'Female';
+  if (gender === 'Female') return 'Male';
+  return null;
+};
+
+const parseHeightToCm = (value) => {
+  if (typeof value !== 'string' && typeof value !== 'number') return null;
+  const normalized = String(value).trim().toLowerCase();
+
+  if (!normalized) return null;
+
+  const feetInches = normalized.match(/(\d+)\s*'?\s*(\d+)?\s*"?/);
+  if (feetInches && normalized.includes("'")) {
+    const feet = Number(feetInches[1]);
+    const inches = Number(feetInches[2] || 0);
+    return Math.round((feet * 12 + inches) * 2.54);
+  }
+
+  const numeric = normalized.match(/\d+(\.\d+)?/);
+  if (!numeric) return null;
+
+  const parsed = Number(numeric[0]);
+  if (Number.isNaN(parsed)) return null;
+
+  if (parsed <= 8) {
+    return Math.round(parsed * 30.48);
+  }
+
+  return Math.round(parsed);
+};
+
+const pushReason = (reasons, reason) => {
+  if (reason && !reasons.includes(reason) && reasons.length < 6) {
+    reasons.push(reason);
+  }
+};
+
 /**
  * Calculates a compatibility score between two users.
  * @param {Object} user1 
@@ -11,22 +74,23 @@ const calculateScore = (user1, user2) => {
   let score = 0;
   const reasons = [];
 
-  // 1. Religion/Community (Must match or be open)
-  const religion1 = user1.personalDetails?.religion;
-  const religion2 = user2.personalDetails?.religion;
-  const community1 = user1.personalDetails?.community;
-  const community2 = user2.personalDetails?.community;
+  // 1. Religion/Community
+  const religion1 = normalizeString(user1.personalDetails?.religion);
+  const religion2 = normalizeString(user2.personalDetails?.religion);
+  const community1 = normalizeString(user1.personalDetails?.community);
+  const community2 = normalizeString(user2.personalDetails?.community);
 
-  if (religion1 === religion2) {
-    score += 20;
-    reasons.push(`Shared religious background (${religion1})`);
-    if (community1 === community2) {
-      score += 10;
-      reasons.push(`Same community: ${community1}`);
-    }
-  } else if (religion1 === 'Other' || religion2 === 'Other' || !religion1 || !religion2) {
+  if (religion1 && religion2 && religion1 === religion2) {
+    score += 18;
+    pushReason(reasons, `Shared religious background (${user1.personalDetails?.religion})`);
+  } else if (!religion1 || !religion2 || religion1 === 'other' || religion2 === 'other') {
+    score += 8;
+    pushReason(reasons, 'Flexible on religious background');
+  }
+
+  if (community1 && community2 && community1 === community2) {
     score += 10;
-    reasons.push('Open to different religious backgrounds');
+    pushReason(reasons, `Same community (${user1.personalDetails?.community})`);
   }
 
   // 2. Age Difference
@@ -34,110 +98,245 @@ const calculateScore = (user1, user2) => {
   const age2 = user2.age;
   if (age1 && age2) {
     const ageDiff = Math.abs(age1 - age2);
-    if (ageDiff <= 3) {
-      score += 20;
-      reasons.push('Perfect age compatibility');
-    } else if (ageDiff <= 7) {
-      score += 10;
-      reasons.push('Compatible age difference');
+    if (ageDiff <= 2) {
+      score += 18;
+      pushReason(reasons, 'Very close age match');
+    } else if (ageDiff <= 5) {
+      score += 12;
+      pushReason(reasons, 'Comfortable age compatibility');
+    } else if (ageDiff <= 8) {
+      score += 6;
     }
   }
 
   // 3. Education
-  const edu1 = user1.careerDetails?.education;
-  const edu2 = user2.careerDetails?.education;
+  const edu1 = normalizeString(user1.careerDetails?.education);
+  const edu2 = normalizeString(user2.careerDetails?.education);
   if (edu1 && edu2 && edu1 === edu2) {
-    score += 15;
-    reasons.push(`Similar educational background: ${edu1}`);
+    score += 12;
+    pushReason(reasons, `Similar educational background (${user1.careerDetails?.education})`);
   }
 
   // 4. Location
-  const city1 = user1.addresses?.[0]?.city;
-  const city2 = user2.addresses?.[0]?.city;
-  const state1 = user1.addresses?.[0]?.state;
-  const state2 = user2.addresses?.[0]?.state;
+  const city1 = normalizeString(user1.addresses?.[0]?.city);
+  const city2 = normalizeString(user2.addresses?.[0]?.city);
+  const state1 = normalizeString(user1.addresses?.[0]?.state);
+  const state2 = normalizeString(user2.addresses?.[0]?.state);
 
   if (city1 && city2 && city1 === city2) {
-    score += 20;
-    reasons.push(`Based in the same city: ${city1}`);
+    score += 18;
+    pushReason(reasons, `Based in the same city (${user1.addresses?.[0]?.city})`);
   } else if (state1 && state2 && state1 === state2) {
     score += 10;
-    reasons.push(`Both from ${state1}`);
+    pushReason(reasons, `Same state preference (${user1.addresses?.[0]?.state})`);
   }
 
-  // 5. Height (Simplified)
-  const h1 = parseInt(user1.personalDetails?.height);
-  const h2 = parseInt(user2.personalDetails?.height);
-  if (!isNaN(h1) && !isNaN(h2)) {
+  // 5. Mother tongue
+  const tongue1 = normalizeString(user1.personalDetails?.motherTongue);
+  const tongue2 = normalizeString(user2.personalDetails?.motherTongue);
+  if (tongue1 && tongue2 && tongue1 === tongue2) {
+    score += 8;
+    pushReason(reasons, `Shared mother tongue (${user1.personalDetails?.motherTongue})`);
+  }
+
+  // 6. Lifestyle alignment
+  const diet1 = normalizeString(user1.lifestyleDetails?.diet);
+  const diet2 = normalizeString(user2.lifestyleDetails?.diet);
+  if (diet1 && diet2 && diet1 === diet2) {
+    score += 8;
+    pushReason(reasons, `Matching dietary preference (${user1.lifestyleDetails?.diet})`);
+  }
+
+  // 7. Family values alignment
+  const familyType1 = normalizeString(user1.familyDetails?.familyType);
+  const familyType2 = normalizeString(user2.familyDetails?.familyType);
+  if (familyType1 && familyType2 && familyType1 === familyType2) {
+    score += 7;
+    pushReason(reasons, `Both prefer ${user1.familyDetails?.familyType} family structure`);
+  }
+
+  // 8. Height compatibility
+  const h1 = parseHeightToCm(user1.personalDetails?.height);
+  const h2 = parseHeightToCm(user2.personalDetails?.height);
+  if (h1 !== null && h2 !== null) {
     const hDiff = Math.abs(h1 - h2);
-    if (hDiff <= 10) {
-      score += 10;
-      reasons.push('Compatible height');
+    if (hDiff <= 8) {
+      score += 8;
+      pushReason(reasons, 'Comfortable height compatibility');
+    } else if (hDiff <= 14) {
+      score += 4;
     }
   }
 
   // Determine compatibility level
   let compatibility = 'Developing';
   if (score >= 70) compatibility = 'Strong';
-  else if (score >= 40) compatibility = 'Moderate';
+  else if (score >= 45) compatibility = 'Moderate';
+
+  if (reasons.length === 0) {
+    reasons.push('Core profile values are reasonably aligned');
+  }
 
   return { score, compatibility, reasons };
 };
 
 /**
- * Generates matches for a specific user.
- * @param {string} userId 
+ * Fetches currently visible matches for a user in a cycle.
  */
-const generateMatchesForUser = async (userId) => {
-  const user = await User.findById(userId);
-  if (!user || !user.isVerified) return;
-
-  const oppositeGender = user.gender === 'Male' ? 'Female' : 'Male';
-  
-  const potentialMatches = await User.find({
-    gender: oppositeGender,
-    isVerified: true,
-    _id: { $ne: userId }
-  });
-
-  const matchPromises = potentialMatches.map(async (potential) => {
-    const { score, compatibility, reasons } = calculateScore(user, potential);
-    
-    // Only save matches with at least 'Moderate' compatibility if needed, 
-    // or save all for variety. Let's save if score > 30.
-    if (score >= 30) {
-      return Match.findOneAndUpdate(
-        { user: userId, matchedUser: potential._id },
-        { 
-          score, 
-          compatibility, 
-          matchReasons: reasons,
-          isDeleted: false 
-        },
-        { upsert: true, new: true }
-      );
-    }
-  });
-
-  await Promise.all(matchPromises);
+const getVisibleMatchesForCycle = async (userId, cycleKey) => {
+  return Match.find({
+    user: userId,
+    isDeleted: false,
+    visibleInCycle: true,
+    cycleKey,
+  })
+    .sort({ score: -1, updatedAt: 1 })
+    .limit(MAX_VISIBLE_MATCHES);
 };
 
 /**
- * Runs the engine for all verified users.
+ * Generates the visible top matches for a specific user and cycle.
+ * @param {string|ObjectId} userId
+ * @param {Object} [options]
+ */
+const generateVisibleMatchesForUser = async (userId, options = {}) => {
+  const now = options.now instanceof Date ? options.now : new Date();
+  const forceRefresh = Boolean(options.forceRefresh);
+  const cycleKey = getCycleKey(now);
+
+  if (!forceRefresh) {
+    const existingCycleMatches = await getVisibleMatchesForCycle(userId, cycleKey);
+    if (existingCycleMatches.length > 0) {
+      return existingCycleMatches;
+    }
+  }
+
+  const user = await User.findById(userId).lean();
+  if (!user || !user.isVerified) return [];
+
+  const oppositeGender = toOppositeGender(user.gender);
+  if (!oppositeGender) {
+    await Match.updateMany({ user: userId, visibleInCycle: true }, { $set: { visibleInCycle: false } });
+    return [];
+  }
+
+  const potentialMatches = await User.find({
+    gender: oppositeGender,
+    isVerified: true,
+    _id: { $ne: userId },
+  }).lean();
+
+  if (!potentialMatches.length) {
+    await Match.updateMany({ user: userId, visibleInCycle: true }, { $set: { visibleInCycle: false } });
+    return [];
+  }
+
+  const previousMatches = await Match.find({
+    user: userId,
+    matchedUser: { $in: potentialMatches.map((candidate) => candidate._id) },
+  })
+    .select('matchedUser lastShownAt')
+    .lean();
+
+  const previousMatchMap = new Map(
+    previousMatches.map((matchDoc) => [matchDoc.matchedUser.toString(), matchDoc])
+  );
+
+  const cutoff = new Date(now.getTime() - NO_REPEAT_DAYS * DAY_MS);
+  const candidates = [];
+
+  for (const potential of potentialMatches) {
+    const { score, compatibility, reasons } = calculateScore(user, potential);
+    if (score < MIN_MATCH_SCORE) {
+      continue;
+    }
+
+    const previous = previousMatchMap.get(potential._id.toString());
+    if (previous?.lastShownAt && new Date(previous.lastShownAt) > cutoff) {
+      continue;
+    }
+
+    candidates.push({
+      matchedUser: potential._id,
+      score,
+      compatibility,
+      matchReasons: reasons,
+      fullname: potential.fullname || '',
+    });
+  }
+
+  candidates.sort((a, b) => {
+    if (b.score !== a.score) return b.score - a.score;
+
+    const compatibilityDelta =
+      (COMPATIBILITY_RANK[b.compatibility] || 0) - (COMPATIBILITY_RANK[a.compatibility] || 0);
+    if (compatibilityDelta !== 0) return compatibilityDelta;
+
+    return a.fullname.localeCompare(b.fullname);
+  });
+
+  const selected = candidates.slice(0, MAX_VISIBLE_MATCHES);
+
+  await Match.updateMany({ user: userId, visibleInCycle: true }, { $set: { visibleInCycle: false } });
+
+  if (!selected.length) {
+    return [];
+  }
+
+  await Match.bulkWrite(
+    selected.map((candidate) => ({
+      updateOne: {
+        filter: { user: userId, matchedUser: candidate.matchedUser },
+        update: {
+          $set: {
+            user: userId,
+            matchedUser: candidate.matchedUser,
+            score: candidate.score,
+            compatibility: candidate.compatibility,
+            matchReasons: candidate.matchReasons,
+            isDeleted: false,
+            visibleInCycle: true,
+            cycleKey,
+            lastShownAt: now,
+          },
+        },
+        upsert: true,
+      },
+    }))
+  );
+
+  return getVisibleMatchesForCycle(userId, cycleKey);
+};
+
+/**
+ * Runs the engine for all verified users to maintain rotating match batches.
  */
 const runMatchEngine = async () => {
-  const verifiedUsers = await User.find({ isVerified: true });
-  console.log(`[MatchEngine] Running for ${verifiedUsers.length} verified users...`);
+  const now = new Date();
+  const cycleKey = getCycleKey(now);
+  const verifiedUsers = await User.find({ isVerified: true }).select('_id');
+  console.log(
+    `[MatchEngine] Running rotation for ${verifiedUsers.length} verified users (cycle ${cycleKey}).`
+  );
 
   for (const user of verifiedUsers) {
-    await generateMatchesForUser(user._id);
+    await generateVisibleMatchesForUser(user._id, { now });
   }
   
-  console.log('[MatchEngine] Finished daily match generation.');
+  console.log('[MatchEngine] Finished rotating match generation.');
 };
 
 module.exports = {
   calculateScore,
-  generateMatchesForUser,
-  runMatchEngine
+  generateVisibleMatchesForUser,
+  runMatchEngine,
+  getCycleKey,
+  getNextRefreshAt,
+  getRotationWindowMs,
+  MATCH_CONFIG: {
+    MAX_VISIBLE_MATCHES,
+    NO_REPEAT_DAYS,
+    ROTATION_MINUTES,
+    MIN_MATCH_SCORE,
+  },
 };
