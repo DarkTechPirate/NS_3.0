@@ -1,4 +1,5 @@
 const Match = require("../models/Match");
+const User = require("../models/userModel");
 const Notification = require("../models/Notification");
 const socketService = require("../services/socketService");
 const mongoose = require("mongoose");
@@ -8,6 +9,12 @@ const {
     getNextRefreshAt,
     MATCH_CONFIG,
 } = require("../services/matchEngine");
+
+const toOppositeGender = (gender) => {
+    if (gender === "Male") return "Female";
+    if (gender === "Female") return "Male";
+    return null;
+};
 
 /**
  * @desc Get all matches for a user with optional filtering
@@ -78,6 +85,50 @@ exports.getMatches = async (req, res) => {
 
         const matches = await Match.aggregate(pipeline);
 
+        let insights = null;
+        if (matches.length === 0) {
+            const requester = await User.findById(userId).select("gender").lean();
+            const oppositeGender = toOppositeGender(requester?.gender);
+
+            if (!oppositeGender) {
+                insights = {
+                    reason: "MISSING_GENDER",
+                    message: "Set your gender in profile to receive opposite-gender matches.",
+                };
+            } else {
+                const [oppositeTotal, oppositeVerified] = await Promise.all([
+                    User.countDocuments({ role: "user", gender: oppositeGender, _id: { $ne: userId } }),
+                    User.countDocuments({ role: "user", gender: oppositeGender, isVerified: true, _id: { $ne: userId } }),
+                ]);
+
+                if (oppositeTotal === 0) {
+                    insights = {
+                        reason: "NO_OPPOSITE_PROFILES",
+                        message: "No opposite-gender profiles are available yet.",
+                        oppositeGender,
+                        oppositeTotal,
+                        oppositeVerified,
+                    };
+                } else if (oppositeVerified === 0) {
+                    insights = {
+                        reason: "NO_VERIFIED_OPPOSITE_PROFILES",
+                        message: "Opposite-gender profiles exist but none are verified yet.",
+                        oppositeGender,
+                        oppositeTotal,
+                        oppositeVerified,
+                    };
+                } else {
+                    insights = {
+                        reason: "NO_MATCHES_THIS_CYCLE",
+                        message: "No profiles qualified this cycle. Match feed will refresh shortly.",
+                        oppositeGender,
+                        oppositeTotal,
+                        oppositeVerified,
+                    };
+                }
+            }
+        }
+
         res.status(200).json({
             success: true,
             count: matches.length,
@@ -89,6 +140,7 @@ exports.getMatches = async (req, res) => {
                 maxVisible: MATCH_CONFIG.MAX_VISIBLE_MATCHES,
                 noRepeatDays: MATCH_CONFIG.NO_REPEAT_DAYS,
             },
+            insights,
         });
     } catch (error) {
         console.error(`[MatchController] getMatches Error: ${error.message}`);

@@ -5,6 +5,7 @@ const MAX_VISIBLE_MATCHES = Math.max(1, Number(process.env.MATCH_MAX_VISIBLE || 
 const NO_REPEAT_DAYS = Math.max(1, Number(process.env.MATCH_NO_REPEAT_DAYS || 7));
 const ROTATION_MINUTES = Math.max(1, Number(process.env.MATCH_ROTATION_MINUTES || 1));
 const MIN_MATCH_SCORE = Math.max(0, Number(process.env.MATCH_MIN_SCORE || 30));
+const ALLOW_RECENT_REPEAT_FALLBACK = process.env.MATCH_ALLOW_RECENT_REPEAT_FALLBACK !== 'false';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const MINUTE_MS = 60 * 1000;
@@ -61,6 +62,36 @@ const parseHeightToCm = (value) => {
 const pushReason = (reasons, reason) => {
   if (reason && !reasons.includes(reason) && reasons.length < 6) {
     reasons.push(reason);
+  }
+};
+
+const compareCandidates = (a, b) => {
+  if (b.score !== a.score) return b.score - a.score;
+
+  const compatibilityDelta =
+    (COMPATIBILITY_RANK[b.compatibility] || 0) - (COMPATIBILITY_RANK[a.compatibility] || 0);
+  if (compatibilityDelta !== 0) return compatibilityDelta;
+
+  return (a.fullname || '').localeCompare(b.fullname || '');
+};
+
+const compareByOldestAndScore = (a, b) => {
+  const aLastShown = a.lastShownAt ? new Date(a.lastShownAt).getTime() : 0;
+  const bLastShown = b.lastShownAt ? new Date(b.lastShownAt).getTime() : 0;
+
+  if (aLastShown !== bLastShown) return aLastShown - bLastShown;
+  return compareCandidates(a, b);
+};
+
+const appendUntilLimit = (target, source, limit, seenIds) => {
+  for (const candidate of source) {
+    if (target.length >= limit) break;
+
+    const key = String(candidate.matchedUser);
+    if (seenIds.has(key)) continue;
+
+    seenIds.add(key);
+    target.push(candidate);
   }
 };
 
@@ -212,7 +243,7 @@ const generateVisibleMatchesForUser = async (userId, options = {}) => {
   }
 
   const user = await User.findById(userId).lean();
-  if (!user || !user.isVerified) return [];
+  if (!user) return [];
 
   const oppositeGender = toOppositeGender(user.gender);
   if (!oppositeGender) {
@@ -221,6 +252,7 @@ const generateVisibleMatchesForUser = async (userId, options = {}) => {
   }
 
   const potentialMatches = await User.find({
+    role: 'user',
     gender: oppositeGender,
     isVerified: true,
     _id: { $ne: userId },
@@ -247,14 +279,9 @@ const generateVisibleMatchesForUser = async (userId, options = {}) => {
 
   for (const potential of potentialMatches) {
     const { score, compatibility, reasons } = calculateScore(user, potential);
-    if (score < MIN_MATCH_SCORE) {
-      continue;
-    }
-
     const previous = previousMatchMap.get(potential._id.toString());
-    if (previous?.lastShownAt && new Date(previous.lastShownAt) > cutoff) {
-      continue;
-    }
+    const lastShownAt = previous?.lastShownAt ? new Date(previous.lastShownAt) : null;
+    const recentlyShown = Boolean(lastShownAt && lastShownAt > cutoff);
 
     candidates.push({
       matchedUser: potential._id,
@@ -262,20 +289,37 @@ const generateVisibleMatchesForUser = async (userId, options = {}) => {
       compatibility,
       matchReasons: reasons,
       fullname: potential.fullname || '',
+      lastShownAt,
+      recentlyShown,
     });
   }
 
-  candidates.sort((a, b) => {
-    if (b.score !== a.score) return b.score - a.score;
+  const highScoreFresh = candidates
+    .filter((candidate) => candidate.score >= MIN_MATCH_SCORE && !candidate.recentlyShown)
+    .sort(compareCandidates);
 
-    const compatibilityDelta =
-      (COMPATIBILITY_RANK[b.compatibility] || 0) - (COMPATIBILITY_RANK[a.compatibility] || 0);
-    if (compatibilityDelta !== 0) return compatibilityDelta;
+  const lowScoreFresh = candidates
+    .filter((candidate) => candidate.score < MIN_MATCH_SCORE && !candidate.recentlyShown)
+    .sort(compareCandidates);
 
-    return a.fullname.localeCompare(b.fullname);
-  });
+  const highScoreRecent = candidates
+    .filter((candidate) => candidate.score >= MIN_MATCH_SCORE && candidate.recentlyShown)
+    .sort(compareByOldestAndScore);
 
-  const selected = candidates.slice(0, MAX_VISIBLE_MATCHES);
+  const lowScoreRecent = candidates
+    .filter((candidate) => candidate.score < MIN_MATCH_SCORE && candidate.recentlyShown)
+    .sort(compareByOldestAndScore);
+
+  const selected = [];
+  const selectedIds = new Set();
+
+  appendUntilLimit(selected, highScoreFresh, MAX_VISIBLE_MATCHES, selectedIds);
+  appendUntilLimit(selected, lowScoreFresh, MAX_VISIBLE_MATCHES, selectedIds);
+
+  if (ALLOW_RECENT_REPEAT_FALLBACK) {
+    appendUntilLimit(selected, highScoreRecent, MAX_VISIBLE_MATCHES, selectedIds);
+    appendUntilLimit(selected, lowScoreRecent, MAX_VISIBLE_MATCHES, selectedIds);
+  }
 
   await Match.updateMany({ user: userId, visibleInCycle: true }, { $set: { visibleInCycle: false } });
 
@@ -338,5 +382,6 @@ module.exports = {
     NO_REPEAT_DAYS,
     ROTATION_MINUTES,
     MIN_MATCH_SCORE,
+    ALLOW_RECENT_REPEAT_FALLBACK,
   },
 };

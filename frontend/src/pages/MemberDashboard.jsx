@@ -12,6 +12,7 @@ const MemberDashboard = () => {
   const [actionLoading, setActionLoading] = useState(null);
   const [declinedMatches, setDeclinedMatches] = useState([]);
   const [rotationInfo, setRotationInfo] = useState(null);
+  const [matchInsight, setMatchInsight] = useState(null);
 
   const fetchMatchesData = useCallback(async () => {
     try {
@@ -20,6 +21,7 @@ const MemberDashboard = () => {
       // Match controller returns { success: true, data: [...] }
       setMatches(res.data || []);
       setRotationInfo(res.rotation || null);
+      setMatchInsight(res.insights || null);
       setDeclinedMatches((prev) => prev.filter((id) => (res.data || []).some((m) => m._id === id)));
     } catch (error) {
       console.error("Error fetching matches:", error);
@@ -77,6 +79,26 @@ const MemberDashboard = () => {
       hour: '2-digit',
       minute: '2-digit',
     });
+  };
+
+  const getEmptyStateMessage = () => {
+    if (!matchInsight?.reason) {
+      return 'Your curated selections will appear here once our team has reviewed your profile.';
+    }
+
+    if (matchInsight.reason === 'MISSING_GENDER') {
+      return 'Please complete your gender in profile to receive curated matches.';
+    }
+
+    if (matchInsight.reason === 'NO_OPPOSITE_PROFILES') {
+      return 'No opposite-gender profiles are available yet. New profiles will appear automatically.';
+    }
+
+    if (matchInsight.reason === 'NO_VERIFIED_OPPOSITE_PROFILES') {
+      return 'Profiles are available, but none are verified yet. Matches will appear once verification completes.';
+    }
+
+    return 'No profiles qualified this cycle. We will refresh your top picks automatically.';
   };
 
   if (loading) {
@@ -245,7 +267,7 @@ const MemberDashboard = () => {
             </div>
             <h2 className="text-xl font-serif font-medium text-[#1a1a1a] mb-2">No matches yet</h2>
             <p className="text-stone-500 max-w-md mx-auto">
-              Your curated selections will appear here once our team has reviewed your profile.
+              {getEmptyStateMessage()}
             </p>
           </div>
         )}

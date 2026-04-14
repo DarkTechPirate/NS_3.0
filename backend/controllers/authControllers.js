@@ -2,14 +2,12 @@ const User = require("../models/userModel");
 const bcrypt = require("bcryptjs");
 const generateTokenAndSetCookie = require("../utils/generateToken");
 
-const toAuthResponseUser = (user) => ({
-    id: user._id,
-    email: user.email,
-    fullname: user.fullname,
-    username: user.username,
-    role: user.role,
-    isVerified: user.isVerified,
-});
+const toAuthResponseUser = (user) => {
+    const safeUser = typeof user.toObject === "function" ? user.toObject() : { ...user };
+    delete safeUser.password;
+    delete safeUser.__v;
+    return safeUser;
+};
 
 // ==============================================
 // 1. SIGNUP
