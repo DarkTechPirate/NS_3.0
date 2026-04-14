@@ -195,19 +195,15 @@ const MatchDetailScreen = () => {
               <div className="flex flex-col gap-4">
                 {match.matchReasons?.map((reason, index) => (
                   <div key={index} className="group bg-surface border border-line p-6 rounded-xl shadow-sm hover:border-rajkumari/30 transition-colors">
-                    <div className="flex gap-4">
-                      <div className="shrink-0 mt-1">
-                        <div className="bg-rose-50 text-rajkumari rounded-lg size-10 flex items-center justify-center">
-                          <span className="material-symbols-outlined text-[20px]">stars</span>
-                        </div>
+                    <div className="grid grid-cols-[40px_1fr] gap-4 items-start">
+                      <div className="bg-rose-50 text-rajkumari rounded-lg size-10 flex items-center justify-center mt-0.5">
+                        <span className="material-symbols-outlined text-[20px]">stars</span>
                       </div>
-                      <div>
-                        <h4 className="text-ink font-bold text-base mb-1">Point of Resonance</h4>
+                      <div className="flex flex-col gap-2">
+                        <h4 className="text-ink font-bold text-base leading-tight">Point of Resonance</h4>
                         <p className="text-ink-light text-sm font-light leading-relaxed">{reason}</p>
                       </div>
-                      <h3 className="text-2xl font-serif font-bold text-ink">Why we paired you</h3>
                     </div>
-                    <p className="text-ink-light text-sm font-light leading-relaxed pl-11">These are the strongest points of alignment identified during curation.</p>
                   </div>
                 ))}
               </div>
