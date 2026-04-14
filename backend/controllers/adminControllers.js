@@ -18,6 +18,31 @@ exports.getPendingUsers = async (req, res) => {
 };
 
 /**
+ * @desc Get all users for admin overview
+ * @route GET /api/admin/users
+ * @access Private/Admin
+ */
+exports.getAllUsers = async (req, res) => {
+    try {
+        const users = await User.find({ role: "user" })
+            .select("-password")
+            .sort({ createdAt: -1 });
+
+        res.status(200).json({
+            success: true,
+            count: users.length,
+            data: users,
+        });
+    } catch (error) {
+        console.error(`[Admin] getAllUsers Error: ${error.message}`);
+        res.status(500).json({
+            success: false,
+            message: "Failed to fetch users.",
+        });
+    }
+};
+
+/**
  * @desc Get specific user detail
  * @route GET /api/admin/users/:id
  * @access Private/Admin

@@ -17,6 +17,7 @@ const matchRoutes = require('./routes/matchRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
 const sseService = require('./services/sseService');
+const { ensureDefaultAdminAccount } = require('./services/adminBootstrap');
 const { protect } = require('./middleware/authMiddleware');
 
 
@@ -194,6 +195,7 @@ app.get('/', (req, res) => {
 (async () => {
   try {
     await connectMongo();
+    await ensureDefaultAdminAccount();
 
 
 

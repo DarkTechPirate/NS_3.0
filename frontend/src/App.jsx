@@ -15,6 +15,7 @@ import Privacy from './pages/Privacy';
 import Terms from './pages/Terms';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
+import AdminLogin from './pages/AdminLogin';
 import AdminDashboard from './pages/AdminDashboard';
 import AdminRoute from './components/AdminRoute';
 import { isProfileComplete } from './utils/profileCompletion';
@@ -35,6 +36,9 @@ const PublicRoute = ({ children }) => {
   const { user, loading } = useAuth();
   if (loading) return null; // Or spinner
   if (user) {
+    if (user.role === 'admin') {
+      return <Navigate to="/admin" replace />;
+    }
     return <Navigate to={isProfileComplete(user) ? '/dashboard' : '/create-profile'} replace />;
   }
   return children;
@@ -56,6 +60,12 @@ function App() {
           <Route path="/signup" element={
             <PublicRoute>
               <Signup />
+            </PublicRoute>
+          } />
+
+          <Route path="/admin-login" element={
+            <PublicRoute>
+              <AdminLogin />
             </PublicRoute>
           } />
 

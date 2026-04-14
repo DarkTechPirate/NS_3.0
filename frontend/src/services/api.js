@@ -27,6 +27,18 @@ export const loginUser = async (email, password) => {
     }
 };
 
+export const adminLoginUser = async (loginId, password) => {
+    try {
+        const response = await api.post('/auth/admin/login', { loginId, password });
+        return { success: true, user: response.data.user };
+    } catch (error) {
+        return {
+            success: false,
+            message: error.response?.data?.message || 'Admin login failed',
+        };
+    }
+};
+
 export const SignUp = async (fullname, email, password, confirmPassword) => {
     try {
         const response = await api.post('/auth/signup', {
@@ -193,6 +205,37 @@ export const expressInterest = async (matchId) => {
     } catch (error) {
         console.error('Express interest error:', error);
         throw error.response?.data?.message || 'Failed to express interest';
+    }
+};
+
+// Admin API Calls
+export const getAdminUsers = async () => {
+    try {
+        const response = await api.get('/admin/users');
+        return response.data;
+    } catch (error) {
+        console.error('Fetch admin users error:', error);
+        throw error.response?.data?.message || 'Failed to fetch users';
+    }
+};
+
+export const getPendingAdminUsers = async () => {
+    try {
+        const response = await api.get('/admin/pending');
+        return response.data;
+    } catch (error) {
+        console.error('Fetch pending users error:', error);
+        throw error.response?.data?.message || 'Failed to fetch pending users';
+    }
+};
+
+export const verifyAdminUser = async (userId, isVerified) => {
+    try {
+        const response = await api.patch(`/admin/users/${userId}/verify`, { isVerified });
+        return response.data;
+    } catch (error) {
+        console.error('Verify user error:', error);
+        throw error.response?.data?.message || 'Failed to update verification status';
     }
 };
 

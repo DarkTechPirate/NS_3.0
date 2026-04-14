@@ -14,7 +14,7 @@ const Login = () => {
 
     useEffect(() => {
         if (user) {
-            navigate('/dashboard');
+            navigate(user.role === 'admin' ? '/admin' : '/dashboard', { replace: true });
         }
     }, [user, navigate]);
 
@@ -31,7 +31,7 @@ const Login = () => {
 
         if (res.success) {
             setUser(res.user);
-            navigate('/dashboard'); // Go to dashboard after login
+            navigate(res.user?.role === 'admin' ? '/admin' : '/dashboard', { replace: true });
         } else {
             setError(res.message);
         }
@@ -137,6 +137,12 @@ const Login = () => {
                         Don't have an account?{' '}
                         <Link to="/signup" className="font-bold text-rajkumari hover:text-rajkumari-pink transition-colors">
                             Apply Now
+                        </Link>
+                    </p>
+                    <p className="text-sm text-text-muted mt-2">
+                        Admin?{' '}
+                        <Link to="/admin-login" className="font-bold text-rajkumari hover:text-rajkumari-pink transition-colors">
+                            Sign in here
                         </Link>
                     </p>
                 </div>

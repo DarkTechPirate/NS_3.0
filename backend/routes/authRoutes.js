@@ -6,6 +6,7 @@ const generateTokenAndSetCookie = require("../utils/generateToken");
 const { protect } = require("../middleware/authMiddleware");
 const {
     Login,
+    AdminLogin,
     Signup,
     Logout,
     Me,
@@ -21,6 +22,7 @@ const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 // ==============================================
 router.post("/signup", Signup);
 router.post("/login", Login);
+router.post("/admin/login", AdminLogin);
 router.get("/logout", Logout);
 router.get("/me", protect(), Me);
 router.post("/reset-password", resetPassword);

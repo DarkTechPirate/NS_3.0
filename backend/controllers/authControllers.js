@@ -2,6 +2,15 @@ const User = require("../models/userModel");
 const bcrypt = require("bcryptjs");
 const generateTokenAndSetCookie = require("../utils/generateToken");
 
+const toAuthResponseUser = (user) => ({
+    id: user._id,
+    email: user.email,
+    fullname: user.fullname,
+    username: user.username,
+    role: user.role,
+    isVerified: user.isVerified,
+});
+
 // ==============================================
 // 1. SIGNUP
 // ==============================================
@@ -58,12 +67,7 @@ exports.Signup = async (req, res) => {
 
         res.status(201).json({
             message: "Signup successful",
-            user: {
-                id: newUser._id,
-                email: newUser.email,
-                fullname: newUser.fullname,
-                username: newUser.username,
-            },
+            user: toAuthResponseUser(newUser),
         });
     } catch (error) {
         console.error("Signup Error:", error);
@@ -82,7 +86,9 @@ exports.Login = async (req, res) => {
             return res.status(400).json({ message: "Missing fields" });
         }
 
-        const user = await User.findOne({ email });
+        const user = await User.findOne({
+            $or: [{ email }, { username: email }],
+        });
         if (!user) return res.status(404).json({ message: "User not found" });
 
         // Verify Password
@@ -94,12 +100,7 @@ exports.Login = async (req, res) => {
 
         res.status(200).json({
             message: "Login successful",
-            user: {
-                id: user._id,
-                email: user.email,
-                fullname: user.fullname,
-                username: user.username,
-            },
+            user: toAuthResponseUser(user),
         });
     } catch (error) {
         res.status(500).json({ message: error.message });
@@ -107,7 +108,45 @@ exports.Login = async (req, res) => {
 };
 
 // ==============================================
-// 3. LOGOUT
+// 3. ADMIN LOGIN
+// ==============================================
+exports.AdminLogin = async (req, res) => {
+    try {
+        const loginId = String(req.body.loginId || req.body.email || "").trim();
+        const password = String(req.body.password || "");
+
+        if (!loginId || !password) {
+            return res.status(400).json({ message: "Missing fields" });
+        }
+
+        const adminUser = await User.findOne({
+            role: "admin",
+            $or: [{ email: loginId }, { username: loginId }],
+        });
+
+        if (!adminUser) {
+            return res.status(404).json({ message: "Admin user not found" });
+        }
+
+        const match = await bcrypt.compare(password, adminUser.password);
+        if (!match) {
+            return res.status(401).json({ message: "Invalid credentials" });
+        }
+
+        generateTokenAndSetCookie(res, adminUser._id);
+
+        res.status(200).json({
+            message: "Admin login successful",
+            user: toAuthResponseUser(adminUser),
+        });
+    } catch (error) {
+        console.error("Admin Login Error:", error);
+        res.status(500).json({ message: error.message });
+    }
+};
+
+// ==============================================
+// 4. LOGOUT
 // ==============================================
 exports.Logout = (req, res) => {
     // Clear the cookie by setting it to expire immediately
@@ -120,7 +159,7 @@ exports.Logout = (req, res) => {
 };
 
 // ==============================================
-// 4. ME (Check Auth Status)
+// 5. ME (Check Auth Status)
 // ==============================================
 exports.Me = async (req, res) => {
     const user = await User
@@ -134,7 +173,7 @@ exports.Me = async (req, res) => {
 };
 
 // ==============================================
-// 5. reset-password (Forgot Password)
+// 6. reset-password (Forgot Password)
 // ==============================================
 exports.resetPassword = async (req, res) => {
     try {
