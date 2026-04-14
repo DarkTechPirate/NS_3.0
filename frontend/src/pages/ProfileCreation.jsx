@@ -4,7 +4,14 @@ import Logo from '../components/Logo';
 import Header from '../components/Header';
 import { deleteGalleryImage, updateProfileInfo, uploadFileWithChunks } from '../services/api';
 import { useAuth } from '../context/AuthContext';
-import { getProfileCompletionFromForm, isProfileComplete } from '../utils/profileCompletion';
+import {
+  getFirstMissingProfileSectionFromForm,
+  getFirstMissingProfileSectionFromUser,
+  getMissingProfileFieldsFromForm,
+  getMissingProfileFieldsFromUser,
+  getProfileCompletionFromForm,
+  isProfileComplete,
+} from '../utils/profileCompletion';
 import { getBackendBaseUrl } from '../utils/backendUrl';
 const ProfileCreation = () => {
   const { user, setUser } = useAuth();
@@ -1302,19 +1309,34 @@ const ProfileCreation = () => {
 
         const currentIndex = sections.findIndex((s) => s.id === activeSection);
         const isLastSection = currentIndex === sections.length - 1;
+        const currentSection = sections[currentIndex]?.id;
 
         if (!isLastSection) {
+          const missingCurrentSection = getMissingProfileFieldsFromForm(formData, currentSection);
+
+          if (missingCurrentSection.length > 0) {
+            alert(`Please complete these details before continuing:\n- ${missingCurrentSection.join('\n- ')}`);
+            return;
+          }
+
           setActiveSection(sections[currentIndex + 1].id);
           return;
         }
 
         if (!isProfileComplete(nextUser)) {
-          alert('Please complete all required sections, including Lifestyle and at least one photo, before submitting.');
-          if (!nextUser.lifestyleDetails?.diet || !nextUser.lifestyleDetails?.drinking || !nextUser.lifestyleDetails?.smoking || !nextUser.lifestyleDetails?.livingArrangement) {
-            setActiveSection('values');
+          const missingFields = getMissingProfileFieldsFromUser(nextUser);
+          const missingSection =
+            getFirstMissingProfileSectionFromUser(nextUser) ||
+            getFirstMissingProfileSectionFromForm(formData) ||
+            'personal';
+
+          if (missingFields.length > 0) {
+            alert(`Please complete these missing details before submitting:\n- ${missingFields.join('\n- ')}`);
           } else {
-            setActiveSection('portfolio');
+            alert('Please complete all required details before submitting.');
           }
+
+          setActiveSection(missingSection);
           return;
         }
 
