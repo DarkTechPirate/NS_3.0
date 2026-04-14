@@ -66,6 +66,10 @@ const pushReason = (reasons, reason) => {
 };
 
 const compareCandidates = (a, b) => {
+  if (Boolean(b.isVerified) !== Boolean(a.isVerified)) {
+    return Number(Boolean(b.isVerified)) - Number(Boolean(a.isVerified));
+  }
+
   if (b.score !== a.score) return b.score - a.score;
 
   const compatibilityDelta =
@@ -252,9 +256,8 @@ const generateVisibleMatchesForUser = async (userId, options = {}) => {
   }
 
   const potentialMatches = await User.find({
-    role: 'user',
     gender: oppositeGender,
-    isVerified: true,
+    $or: [{ role: 'user' }, { role: { $exists: false } }],
     _id: { $ne: userId },
   }).lean();
 
@@ -289,6 +292,7 @@ const generateVisibleMatchesForUser = async (userId, options = {}) => {
       compatibility,
       matchReasons: reasons,
       fullname: potential.fullname || '',
+      isVerified: Boolean(potential.isVerified),
       lastShownAt,
       recentlyShown,
     });

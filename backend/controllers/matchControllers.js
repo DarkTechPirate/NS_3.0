@@ -97,8 +97,17 @@ exports.getMatches = async (req, res) => {
                 };
             } else {
                 const [oppositeTotal, oppositeVerified] = await Promise.all([
-                    User.countDocuments({ role: "user", gender: oppositeGender, _id: { $ne: userId } }),
-                    User.countDocuments({ role: "user", gender: oppositeGender, isVerified: true, _id: { $ne: userId } }),
+                    User.countDocuments({
+                        $or: [{ role: "user" }, { role: { $exists: false } }],
+                        gender: oppositeGender,
+                        _id: { $ne: userId },
+                    }),
+                    User.countDocuments({
+                        $or: [{ role: "user" }, { role: { $exists: false } }],
+                        gender: oppositeGender,
+                        isVerified: true,
+                        _id: { $ne: userId },
+                    }),
                 ]);
 
                 if (oppositeTotal === 0) {
