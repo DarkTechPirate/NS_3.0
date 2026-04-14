@@ -458,7 +458,7 @@ const FamilyViewMode = () => {
 
                         {/* View Full Profile */}
                         <Link
-                          to={`/match-detail?id=${profile._id}`}
+                          to={`/match-detail/${profile._id}`}
                           className="h-11 px-5 border border-stone-200 hover:border-stone-300 hover:bg-stone-50 text-stone-600 rounded-full font-medium text-sm transition-all flex items-center gap-2 ml-auto"
                         >
                           View Full Profile

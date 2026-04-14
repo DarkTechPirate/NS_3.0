@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useParams } from 'react-router-dom';
 import Logo from '../components/Logo';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
@@ -8,9 +8,10 @@ import { useAuth } from '../context/AuthContext';
 
 const MatchDetailScreen = () => {
   const { user } = useAuth();
+  const { id: routeUserId } = useParams();
   const location = useLocation();
   const queryParams = new URLSearchParams(location.search);
-  const userId = queryParams.get('id');
+  const userId = routeUserId || queryParams.get('id');
 
   const [match, setMatch] = useState(null);
   const [loading, setLoading] = useState(true);

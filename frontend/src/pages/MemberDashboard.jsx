@@ -237,7 +237,7 @@ const MemberDashboard = () => {
 
                       {/* Secondary CTA */}
                       <Link
-                        to={`/match-detail?id=${profile._id}`}
+                        to={`/match-detail/${profile._id}`}
                         className="flex-1 lg:flex-none h-12 px-6 border border-stone-200 hover:border-stone-300 hover:bg-stone-50 text-stone-700 rounded-full font-medium text-sm transition-all flex items-center justify-center"
                       >
                         View Full Profile
