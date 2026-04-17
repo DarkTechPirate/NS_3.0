@@ -7,11 +7,17 @@ const {
     calculateScore,
 } = require("../services/matchEngine");
 
+const normalizeGender = (gender) =>
+    typeof gender === "string" ? gender.trim().toLowerCase() : "";
+
 const toOppositeGender = (gender) => {
-    if (gender === "Male") return "Female";
-    if (gender === "Female") return "Male";
+    const normalized = normalizeGender(gender);
+    if (normalized === "male") return "female";
+    if (normalized === "female") return "male";
     return null;
 };
+
+const toGenderRegex = (gender) => new RegExp(`^${gender}$`, "i");
 
 /**
  * @desc Get all matches for a user with optional filtering
@@ -29,6 +35,11 @@ exports.getMatches = async (req, res) => {
         }
 
         const oppositeGender = toOppositeGender(requester?.gender);
+        const oppositeGenderRegex = oppositeGender ? toGenderRegex(oppositeGender) : null;
+        const oppositeGenderLabel = oppositeGender
+            ? `${oppositeGender.charAt(0).toUpperCase()}${oppositeGender.slice(1)}`
+            : null;
+
         if (!oppositeGender) {
             return res.status(200).json({
                 success: true,
@@ -43,9 +54,9 @@ exports.getMatches = async (req, res) => {
         }
 
         const potentialUsers = await User.find({
-            $or: [{ role: "user" }, { role: { $exists: false } }],
+            role: { $ne: "admin" },
             _id: { $ne: userId },
-            gender: oppositeGender,
+            gender: oppositeGenderRegex,
         }).lean();
 
         if (potentialUsers.length === 0) {
@@ -57,7 +68,7 @@ exports.getMatches = async (req, res) => {
                 insights: {
                     reason: "NO_OPPOSITE_PROFILES",
                     message: "No opposite-gender profiles are available yet.",
-                    oppositeGender,
+                    oppositeGender: oppositeGenderLabel,
                     oppositeTotal: 0,
                     oppositeVerified: 0,
                 },
@@ -138,11 +149,8 @@ exports.getMatches = async (req, res) => {
             },
             {
                 $match: {
-                    "matchedUserDetails.gender": oppositeGender,
-                    $or: [
-                        { "matchedUserDetails.role": "user" },
-                        { "matchedUserDetails.role": { $exists: false } },
-                    ],
+                    "matchedUserDetails.gender": oppositeGenderRegex,
+                    "matchedUserDetails.role": { $ne: "admin" },
                 },
             },
             {
@@ -230,7 +238,7 @@ exports.getMatches = async (req, res) => {
                 insights = {
                     reason: "FILTERS_NO_RESULTS",
                     message: "No profiles matched your current filters. Try broadening your filters.",
-                    oppositeGender,
+                    oppositeGender: oppositeGenderLabel,
                     oppositeTotal: potentialUsers.length,
                     oppositeVerified,
                 };
@@ -238,7 +246,7 @@ exports.getMatches = async (req, res) => {
                 insights = {
                     reason: "NO_MATCHABLE_PROFILES",
                     message: "No profiles are currently available for your criteria.",
-                    oppositeGender,
+                    oppositeGender: oppositeGenderLabel,
                     oppositeTotal: potentialUsers.length,
                     oppositeVerified,
                 };

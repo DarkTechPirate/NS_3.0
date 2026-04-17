@@ -10,7 +10,6 @@ const MemberDashboard = () => {
   const [matches, setMatches] = useState([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(null);
-  const [declinedMatches, setDeclinedMatches] = useState([]);
   const [matchInsight, setMatchInsight] = useState(null);
 
   const fetchMatchesData = useCallback(async () => {
@@ -20,7 +19,6 @@ const MemberDashboard = () => {
       // Match controller returns { success: true, data: [...] }
       setMatches(res.data || []);
       setMatchInsight(res.insights || null);
-      setDeclinedMatches((prev) => prev.filter((id) => (res.data || []).some((m) => m._id === id)));
     } catch (error) {
       console.error("Error fetching matches:", error);
     } finally {
@@ -35,11 +33,15 @@ const MemberDashboard = () => {
     return () => clearInterval(intervalId);
   }, [fetchMatchesData]);
 
-  const visibleMatches = matches.filter(m => !declinedMatches.includes(m._id));
-  const remainingCount = visibleMatches.length;
+  const visibleMatches = matches;
+  const remainingCount = matches.length;
 
   const handleDecline = async (id) => {
-    setDeclinedMatches((prev) => (prev.includes(id) ? prev : [...prev, id]));
+    setMatches((prev) => {
+      const selected = prev.find((item) => item._id === id);
+      if (!selected) return prev;
+      return [...prev.filter((item) => item._id !== id), selected];
+    });
   };
 
   const handleExpressInterest = async (matchId) => {

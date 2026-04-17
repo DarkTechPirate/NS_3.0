@@ -1,7 +1,10 @@
 const User = require('../models/userModel');
 const Match = require('../models/Match');
 
-const MAX_VISIBLE_MATCHES = Math.max(1, Number(process.env.MATCH_MAX_VISIBLE || 3));
+const parsedMaxVisibleMatches = Number(process.env.MATCH_MAX_VISIBLE);
+const MAX_VISIBLE_MATCHES = Number.isFinite(parsedMaxVisibleMatches) && parsedMaxVisibleMatches > 0
+  ? Math.floor(parsedMaxVisibleMatches)
+  : 0;
 const NO_REPEAT_DAYS = Math.max(1, Number(process.env.MATCH_NO_REPEAT_DAYS || 7));
 const ROTATION_MINUTES = Math.max(1, Number(process.env.MATCH_ROTATION_MINUTES || 1));
 const MIN_MATCH_SCORE = Math.max(0, Number(process.env.MATCH_MIN_SCORE || 30));
@@ -26,11 +29,20 @@ const getNextRefreshAt = (at = new Date()) => {
 };
 
 const normalizeString = (value) => (typeof value === 'string' ? value.trim().toLowerCase() : '');
+const normalizeGender = (value) => (typeof value === 'string' ? value.trim().toLowerCase() : '');
 
 const toOppositeGender = (gender) => {
-  if (gender === 'Male') return 'Female';
-  if (gender === 'Female') return 'Male';
+  const normalized = normalizeGender(gender);
+  if (normalized === 'male') return 'female';
+  if (normalized === 'female') return 'male';
   return null;
+};
+
+const toGenderRegex = (gender) => new RegExp(`^${gender}$`, 'i');
+
+const resolveVisibleLimit = (candidateCount) => {
+  if (MAX_VISIBLE_MATCHES > 0) return MAX_VISIBLE_MATCHES;
+  return Math.max(candidateCount, 1);
 };
 
 const parseHeightToCm = (value) => {
@@ -219,14 +231,19 @@ const calculateScore = (user1, user2) => {
  * Fetches currently visible matches for a user in a cycle.
  */
 const getVisibleMatchesForCycle = async (userId, cycleKey) => {
-  return Match.find({
+  const query = Match.find({
     user: userId,
     isDeleted: false,
     visibleInCycle: true,
     cycleKey,
   })
-    .sort({ score: -1, updatedAt: 1 })
-    .limit(MAX_VISIBLE_MATCHES);
+    .sort({ score: -1, updatedAt: 1 });
+
+  if (MAX_VISIBLE_MATCHES > 0) {
+    query.limit(MAX_VISIBLE_MATCHES);
+  }
+
+  return query;
 };
 
 /**
@@ -255,9 +272,11 @@ const generateVisibleMatchesForUser = async (userId, options = {}) => {
     return [];
   }
 
+  const oppositeGenderRegex = toGenderRegex(oppositeGender);
+
   const potentialMatches = await User.find({
-    gender: oppositeGender,
-    $or: [{ role: 'user' }, { role: { $exists: false } }],
+    gender: oppositeGenderRegex,
+    role: { $ne: 'admin' },
     _id: { $ne: userId },
   }).lean();
 
@@ -316,13 +335,14 @@ const generateVisibleMatchesForUser = async (userId, options = {}) => {
 
   const selected = [];
   const selectedIds = new Set();
+  const visibleLimit = resolveVisibleLimit(candidates.length);
 
-  appendUntilLimit(selected, highScoreFresh, MAX_VISIBLE_MATCHES, selectedIds);
-  appendUntilLimit(selected, lowScoreFresh, MAX_VISIBLE_MATCHES, selectedIds);
+  appendUntilLimit(selected, highScoreFresh, visibleLimit, selectedIds);
+  appendUntilLimit(selected, lowScoreFresh, visibleLimit, selectedIds);
 
   if (ALLOW_RECENT_REPEAT_FALLBACK) {
-    appendUntilLimit(selected, highScoreRecent, MAX_VISIBLE_MATCHES, selectedIds);
-    appendUntilLimit(selected, lowScoreRecent, MAX_VISIBLE_MATCHES, selectedIds);
+    appendUntilLimit(selected, highScoreRecent, visibleLimit, selectedIds);
+    appendUntilLimit(selected, lowScoreRecent, visibleLimit, selectedIds);
   }
 
   await Match.updateMany({ user: userId, visibleInCycle: true }, { $set: { visibleInCycle: false } });
