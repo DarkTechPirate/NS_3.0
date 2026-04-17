@@ -49,6 +49,14 @@ export const clearTabAuthSession = () => {
     window.sessionStorage.removeItem(TAB_AUTH_USER_KEY);
 };
 
+export const redirectToGoogleAuth = () => {
+    if (!hasWindow()) return;
+
+    // Clear any stale tab token first so OAuth callback resolves the account from fresh auth.
+    clearTabAuthSession();
+    window.location.assign(GOOGLE_AUTH_URL);
+};
+
 const api = axios.create({
     baseURL: API_URL,
     withCredentials: true, // Important for cookies

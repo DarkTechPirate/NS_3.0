@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { SignUp, GOOGLE_AUTH_URL } from '../services/api';
+import { SignUp, redirectToGoogleAuth } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import Logo from '../components/Logo';
 
@@ -189,7 +189,7 @@ const Signup = () => {
 
                     <button
                         type="button"
-                        onClick={() => (window.location.href = GOOGLE_AUTH_URL)}
+                        onClick={redirectToGoogleAuth}
                         className="w-full flex items-center justify-center gap-3 py-3.5 rounded-full border border-luxury-border bg-white text-text-charcoal font-medium text-sm transition-all duration-300 hover:bg-ghee-light/50 hover:border-ghee-yellow/50"
                     >
                         <img src="https://www.svgrepo.com/show/475656/google-color.svg" alt="Google" className="h-4 w-4" />

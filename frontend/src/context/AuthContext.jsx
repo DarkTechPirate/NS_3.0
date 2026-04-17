@@ -28,6 +28,8 @@ export const AuthProvider = ({ children }) => {
             const res = await checkAuth();
             if (res.success) {
                 setUser(res.user);
+            } else {
+                setUser(null);
             }
             setLoading(false);
         };
