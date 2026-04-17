@@ -153,11 +153,30 @@ const MemberDashboard = () => {
         <div className="flex flex-col gap-10">
           {visibleMatches.map((match) => {
             const profile = match.matchedUserDetails;
+            const hasIncomingInterest = Boolean(match.interestedInYou && !match.mutualInterest);
+            const needsResponse = hasIncomingInterest && !match.interestExpressed;
+
             return (
               <article
                 key={match._id}
-                className="bg-white rounded-2xl overflow-hidden shadow-sm border border-stone-100"
+                className={`rounded-2xl overflow-hidden border transition-all ${
+                  hasIncomingInterest
+                    ? 'bg-gradient-to-r from-[#FFF5F9] via-white to-[#FFF8F2] border-pink-200 shadow-[0_20px_50px_-28px_rgba(225,29,72,0.45)]'
+                    : 'bg-white border-stone-100 shadow-sm'
+                }`}
               >
+                {hasIncomingInterest && (
+                  <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 px-6 py-3 bg-pink-50/90 border-b border-pink-100">
+                    <div className="flex items-center gap-2 text-pink-700">
+                      <span className="material-symbols-outlined text-lg" style={{ fontVariationSettings: "'FILL' 1" }}>favorite</span>
+                      <span className="text-sm font-semibold tracking-wide">Interest Request Waiting</span>
+                    </div>
+                    <p className="text-xs md:text-sm text-pink-600 font-medium">
+                      {needsResponse ? 'Accept to unlock messaging immediately' : 'You have already responded'}
+                    </p>
+                  </div>
+                )}
+
                 <div className="flex flex-col lg:flex-row">
                   {/* Photo Section */}
                   <div className="relative w-full lg:w-[320px] shrink-0">
@@ -165,6 +184,13 @@ const MemberDashboard = () => {
                       className="aspect-[4/5] lg:aspect-auto lg:h-full w-full bg-stone-100 bg-cover bg-center"
                       style={{ backgroundImage: `url('${profile.profilePicture || 'https://via.placeholder.com/320x400'}')` }}
                     ></div>
+
+                    {hasIncomingInterest && (
+                      <div className="absolute bottom-4 left-4 bg-pink-600 text-white px-3 py-1.5 rounded-full text-xs font-semibold shadow-sm">
+                        They liked your profile
+                      </div>
+                    )}
+
                     {/* Verification Badge */}
                     {profile.isVerified && (
                       <div className="absolute top-4 left-4 bg-white/95 backdrop-blur-sm px-3 py-1.5 rounded-full text-xs font-medium text-[#1a1a1a] flex items-center gap-1.5 shadow-sm">
@@ -185,7 +211,11 @@ const MemberDashboard = () => {
                           </h2>
                           <p className="text-stone-500 mt-1">{profile.addresses?.[0]?.city}, {profile.addresses?.[0]?.state}</p>
                         </div>
-                        <div className="bg-amber-50 text-amber-700 px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap border border-amber-100">
+                        <div className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap border ${
+                          hasIncomingInterest
+                            ? 'bg-pink-100 text-pink-700 border-pink-200'
+                            : 'bg-amber-50 text-amber-700 border-amber-100'
+                        }`}>
                           {match.compatibility} Alignment
                         </div>
                       </div>
@@ -207,7 +237,11 @@ const MemberDashboard = () => {
                           </span>
                         )}
                         {!match.mutualInterest && match.interestedInYou && (
-                          <span className="px-3 py-1.5 bg-pink-50 rounded-full text-sm text-pink-700 border border-pink-200 font-semibold">
+                          <span className={`px-3 py-1.5 rounded-full text-sm border font-semibold ${
+                            hasIncomingInterest
+                              ? 'bg-pink-100 text-pink-800 border-pink-300 shadow-sm'
+                              : 'bg-pink-50 text-pink-700 border-pink-200'
+                          }`}>
                             Interested In You
                           </span>
                         )}
@@ -223,19 +257,32 @@ const MemberDashboard = () => {
                     </div>
 
                     {/* Why This Match */}
-                    <div className="bg-[#FDF8F5] rounded-xl p-6 mb-8 border border-orange-50">
-                      <h3 className="text-xs font-semibold uppercase tracking-wider text-stone-400 mb-4">
-                        Why This Match
+                    <div className={`rounded-xl p-6 mb-8 border ${
+                      hasIncomingInterest
+                        ? 'bg-white/85 border-pink-100 ring-1 ring-pink-100/50'
+                        : 'bg-[#FDF8F5] border-orange-50'
+                    }`}>
+                      <h3 className={`text-xs font-semibold uppercase tracking-wider mb-4 ${
+                        hasIncomingInterest ? 'text-pink-500' : 'text-stone-400'
+                      }`}>
+                        {needsResponse ? 'Why They Chose You' : 'Why This Match'}
                       </h3>
                       <ul className="space-y-3">
                         {match.matchReasons?.map((reason, index) => (
                           <li key={index} className="flex items-start gap-3 text-sm text-stone-600 leading-relaxed">
-                            <span className="w-1.5 h-1.5 rounded-full bg-primary mt-2 shrink-0"></span>
+                            <span className={`w-1.5 h-1.5 rounded-full mt-2 shrink-0 ${hasIncomingInterest ? 'bg-pink-500' : 'bg-primary'}`}></span>
                             <span>{reason}</span>
                           </li>
                         ))}
                       </ul>
                     </div>
+
+                    {needsResponse && (
+                      <div className="mb-5 rounded-xl border border-pink-200 bg-pink-50 px-4 py-3 text-sm text-pink-700 flex items-center gap-2">
+                        <span className="material-symbols-outlined text-lg">notifications_active</span>
+                        This member is waiting for your response. Accept to unlock conversation.
+                      </div>
+                    )}
 
                     {/* Actions - Strict Hierarchy */}
                     <div className="flex items-center gap-4 mt-auto pt-4">
@@ -251,7 +298,11 @@ const MemberDashboard = () => {
                         <button
                           onClick={() => handleExpressInterest(match._id)}
                           disabled={actionLoading === match._id || (match.interestExpressed && !match.interestedInYou)}
-                          className="flex-1 lg:flex-none h-12 px-8 bg-primary hover:bg-primary/90 text-white rounded-full font-semibold text-sm transition-all shadow-sm flex items-center justify-center gap-2 disabled:opacity-50"
+                          className={`flex-1 lg:flex-none h-12 px-8 text-white rounded-full font-semibold text-sm transition-all flex items-center justify-center gap-2 disabled:opacity-50 ${
+                            needsResponse
+                              ? 'bg-gradient-to-r from-pink-600 to-[#B20B5A] hover:from-pink-700 hover:to-[#93094B] shadow-[0_12px_30px_-16px_rgba(219,39,119,0.8)]'
+                              : 'bg-primary hover:bg-primary/90 shadow-sm'
+                          }`}
                         >
                           {actionLoading === match._id ? (
                             <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
@@ -265,7 +316,11 @@ const MemberDashboard = () => {
                       {/* Secondary CTA */}
                       <Link
                         to={`/match-detail/${profile._id}`}
-                        className="flex-1 lg:flex-none h-12 px-6 border border-stone-200 hover:border-stone-300 hover:bg-stone-50 text-stone-700 rounded-full font-medium text-sm transition-all flex items-center justify-center"
+                        className={`flex-1 lg:flex-none h-12 px-6 rounded-full font-medium text-sm transition-all flex items-center justify-center ${
+                          hasIncomingInterest
+                            ? 'border border-pink-200 text-pink-700 hover:bg-pink-50 hover:border-pink-300'
+                            : 'border border-stone-200 hover:border-stone-300 hover:bg-stone-50 text-stone-700'
+                        }`}
                       >
                         View Full Profile
                       </Link>
@@ -273,7 +328,11 @@ const MemberDashboard = () => {
                       {/* Tertiary Action - Decline */}
                       <button
                         onClick={() => handleDecline(match._id)}
-                        className="size-12 rounded-full border border-stone-200 hover:border-stone-300 hover:bg-stone-50 flex items-center justify-center text-stone-400 hover:text-stone-500 transition-all ml-auto lg:ml-0"
+                        className={`size-12 rounded-full flex items-center justify-center transition-all ml-auto lg:ml-0 ${
+                          hasIncomingInterest
+                            ? 'border border-pink-200 hover:border-pink-300 hover:bg-pink-50 text-pink-400 hover:text-pink-500'
+                            : 'border border-stone-200 hover:border-stone-300 hover:bg-stone-50 text-stone-400 hover:text-stone-500'
+                        }`}
                         title="Pass"
                       >
                         <span className="material-symbols-outlined">close</span>
