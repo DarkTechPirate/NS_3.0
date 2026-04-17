@@ -11,7 +11,6 @@ const MemberDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(null);
   const [declinedMatches, setDeclinedMatches] = useState([]);
-  const [rotationInfo, setRotationInfo] = useState(null);
   const [matchInsight, setMatchInsight] = useState(null);
 
   const fetchMatchesData = useCallback(async () => {
@@ -20,7 +19,6 @@ const MemberDashboard = () => {
       const res = await getMatches();
       // Match controller returns { success: true, data: [...] }
       setMatches(res.data || []);
-      setRotationInfo(res.rotation || null);
       setMatchInsight(res.insights || null);
       setDeclinedMatches((prev) => prev.filter((id) => (res.data || []).some((m) => m._id === id)));
     } catch (error) {
@@ -84,15 +82,6 @@ const MemberDashboard = () => {
     return now.toLocaleDateString('en-US', options);
   };
 
-  const getNextRefreshTime = () => {
-    if (!rotationInfo?.nextRefreshAt) return null;
-
-    return new Date(rotationInfo.nextRefreshAt).toLocaleTimeString([], {
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  };
-
   const getEmptyStateMessage = () => {
     if (!matchInsight?.reason) {
       return 'Your curated selections will appear here once our team has reviewed your profile.';
@@ -110,7 +99,15 @@ const MemberDashboard = () => {
       return 'Profiles are available, but none are verified yet. Matches will appear once verification completes.';
     }
 
-    return 'No profiles qualified this cycle. We will refresh your top picks automatically.';
+    if (matchInsight.reason === 'FILTERS_NO_RESULTS') {
+      return 'No profiles matched your selected filters. Try broadening your filters.';
+    }
+
+    if (matchInsight.reason === 'NO_MATCHABLE_PROFILES') {
+      return 'No profiles are currently available for your criteria.';
+    }
+
+    return 'No profiles are currently available. Please check back soon.';
   };
 
   if (loading) {
@@ -129,13 +126,13 @@ const MemberDashboard = () => {
         {/* Header Section */}
         <div className="mb-12">
           <p className="text-xs font-medium tracking-widest uppercase text-stone-400 mb-2">
-            Weekly Selection — {getCurrentWeek()}
+            Available Profiles — {getCurrentWeek()}
           </p>
           <h1 className="text-3xl md:text-4xl font-serif font-medium text-[#1a1a1a] mb-4">
             {getGreeting()}, {user?.fullname?.split(' ')[0] || 'Member'}
           </h1>
           <p className="text-stone-500 text-base max-w-xl">
-            Your personal concierge has curated these introductions based on your values and preferences.
+            Explore all available opposite-gender profiles. Use filters to narrow by your preferences.
           </p>
 
           <div className="flex items-center gap-6 mt-6">
@@ -144,11 +141,8 @@ const MemberDashboard = () => {
               <span>{remainingCount} {remainingCount === 1 ? 'match' : 'matches'} remaining</span>
             </div>
             <div className="flex items-center gap-2 text-sm text-stone-400">
-              <span className="material-symbols-outlined text-base">schedule</span>
-              <span>
-                Refreshes every {rotationInfo?.intervalMinutes || 1} min
-                {getNextRefreshTime() ? ` (next: ${getNextRefreshTime()})` : ''}
-              </span>
+              <span className="material-symbols-outlined text-base">tune</span>
+              <span>Filtered by gender and selected preferences</span>
             </div>
           </div>
         </div>

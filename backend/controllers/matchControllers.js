@@ -5,10 +5,6 @@ const socketService = require("../services/socketService");
 const mongoose = require("mongoose");
 const {
     calculateScore,
-    generateVisibleMatchesForUser,
-    getCycleKey,
-    getNextRefreshAt,
-    MATCH_CONFIG,
 } = require("../services/matchEngine");
 
 const toOppositeGender = (gender) => {
@@ -27,10 +23,72 @@ exports.getMatches = async (req, res) => {
         const userId = req.user._id;
         const { community, education, location, diet, familyType } = req.query;
 
-        const now = new Date();
-        await generateVisibleMatchesForUser(userId, { now });
+        const requester = await User.findById(userId).lean();
+        if (!requester) {
+            return res.status(404).json({ success: false, message: "User not found." });
+        }
 
-        const cycleKey = getCycleKey(now);
+        const oppositeGender = toOppositeGender(requester?.gender);
+        if (!oppositeGender) {
+            return res.status(200).json({
+                success: true,
+                count: 0,
+                data: [],
+                mode: "all-available",
+                insights: {
+                    reason: "MISSING_GENDER",
+                    message: "Set your gender in profile to discover opposite-gender matches.",
+                },
+            });
+        }
+
+        const potentialUsers = await User.find({
+            $or: [{ role: "user" }, { role: { $exists: false } }],
+            _id: { $ne: userId },
+            gender: oppositeGender,
+        }).lean();
+
+        if (potentialUsers.length === 0) {
+            return res.status(200).json({
+                success: true,
+                count: 0,
+                data: [],
+                mode: "all-available",
+                insights: {
+                    reason: "NO_OPPOSITE_PROFILES",
+                    message: "No opposite-gender profiles are available yet.",
+                    oppositeGender,
+                    oppositeTotal: 0,
+                    oppositeVerified: 0,
+                },
+            });
+        }
+
+        // Ensure match documents exist for all available opposite-gender users.
+        const upsertOps = potentialUsers.map((candidate) => {
+            const { score, compatibility, reasons } = calculateScore(requester, candidate);
+
+            return {
+                updateOne: {
+                    filter: { user: userId, matchedUser: candidate._id },
+                    update: {
+                        $set: {
+                            user: userId,
+                            matchedUser: candidate._id,
+                            score,
+                            compatibility,
+                            matchReasons: reasons,
+                            isDeleted: false,
+                        },
+                    },
+                    upsert: true,
+                },
+            };
+        });
+
+        if (upsertOps.length > 0) {
+            await Match.bulkWrite(upsertOps, { ordered: false });
+        }
 
         const requesterObjectId = new mongoose.Types.ObjectId(userId);
 
@@ -79,6 +137,15 @@ exports.getMatches = async (req, res) => {
                 },
             },
             {
+                $match: {
+                    "matchedUserDetails.gender": oppositeGender,
+                    $or: [
+                        { "matchedUserDetails.role": "user" },
+                        { "matchedUserDetails.role": { $exists: false } },
+                    ],
+                },
+            },
+            {
                 $addFields: {
                     interestExpressed: { $ifNull: ["$interestExpressed", false] },
                     interestedInYou: {
@@ -86,12 +153,6 @@ exports.getMatches = async (req, res) => {
                     },
                     reverseMutualInterest: {
                         $ifNull: [{ $arrayElemAt: ["$reverseMatch.mutualInterest", 0] }, false],
-                    },
-                    isCurrentCycle: {
-                        $and: [
-                            { $eq: ["$visibleInCycle", true] },
-                            { $eq: ["$cycleKey", cycleKey] },
-                        ],
                     },
                 },
             },
@@ -111,16 +172,6 @@ exports.getMatches = async (req, res) => {
             {
                 $addFields: {
                     canMessage: "$mutualInterest",
-                },
-            },
-            {
-                $match: {
-                    $or: [
-                        { isCurrentCycle: true },
-                        { interestExpressed: true },
-                        { interestedInYou: true },
-                        { mutualInterest: true },
-                    ],
                 },
             },
         ];
@@ -151,14 +202,14 @@ exports.getMatches = async (req, res) => {
             pipeline.push({ $match: dynamicFilters });
         }
 
-        // Prioritize mutual/incoming interest, then current cycle and score.
+        // Prioritize mutual/incoming interest, then ranking score.
         pipeline.push({
             $sort: {
                 mutualInterest: -1,
                 interestedInYou: -1,
                 interestExpressed: -1,
-                isCurrentCycle: -1,
                 score: -1,
+                updatedAt: -1,
             },
         });
         pipeline.push({
@@ -167,60 +218,30 @@ exports.getMatches = async (req, res) => {
                 reverseMutualInterest: 0,
             },
         });
-        pipeline.push({ $limit: MATCH_CONFIG.MAX_VISIBLE_MATCHES });
 
         const matches = await Match.aggregate(pipeline);
 
         let insights = null;
         if (matches.length === 0) {
-            const requester = await User.findById(userId).select("gender").lean();
-            const oppositeGender = toOppositeGender(requester?.gender);
+            const hasFilter = Boolean(community || education || location || diet || familyType);
+            const oppositeVerified = potentialUsers.filter((candidate) => candidate.isVerified).length;
 
-            if (!oppositeGender) {
+            if (hasFilter) {
                 insights = {
-                    reason: "MISSING_GENDER",
-                    message: "Set your gender in profile to receive opposite-gender matches.",
+                    reason: "FILTERS_NO_RESULTS",
+                    message: "No profiles matched your current filters. Try broadening your filters.",
+                    oppositeGender,
+                    oppositeTotal: potentialUsers.length,
+                    oppositeVerified,
                 };
             } else {
-                const [oppositeTotal, oppositeVerified] = await Promise.all([
-                    User.countDocuments({
-                        $or: [{ role: "user" }, { role: { $exists: false } }],
-                        gender: oppositeGender,
-                        _id: { $ne: userId },
-                    }),
-                    User.countDocuments({
-                        $or: [{ role: "user" }, { role: { $exists: false } }],
-                        gender: oppositeGender,
-                        isVerified: true,
-                        _id: { $ne: userId },
-                    }),
-                ]);
-
-                if (oppositeTotal === 0) {
-                    insights = {
-                        reason: "NO_OPPOSITE_PROFILES",
-                        message: "No opposite-gender profiles are available yet.",
-                        oppositeGender,
-                        oppositeTotal,
-                        oppositeVerified,
-                    };
-                } else if (oppositeVerified === 0) {
-                    insights = {
-                        reason: "NO_VERIFIED_OPPOSITE_PROFILES",
-                        message: "Opposite-gender profiles exist but none are verified yet.",
-                        oppositeGender,
-                        oppositeTotal,
-                        oppositeVerified,
-                    };
-                } else {
-                    insights = {
-                        reason: "NO_MATCHES_THIS_CYCLE",
-                        message: "No profiles qualified this cycle. Match feed will refresh shortly.",
-                        oppositeGender,
-                        oppositeTotal,
-                        oppositeVerified,
-                    };
-                }
+                insights = {
+                    reason: "NO_MATCHABLE_PROFILES",
+                    message: "No profiles are currently available for your criteria.",
+                    oppositeGender,
+                    oppositeTotal: potentialUsers.length,
+                    oppositeVerified,
+                };
             }
         }
 
@@ -228,13 +249,7 @@ exports.getMatches = async (req, res) => {
             success: true,
             count: matches.length,
             data: matches,
-            rotation: {
-                cycleKey,
-                nextRefreshAt: getNextRefreshAt(now).toISOString(),
-                intervalMinutes: MATCH_CONFIG.ROTATION_MINUTES,
-                maxVisible: MATCH_CONFIG.MAX_VISIBLE_MATCHES,
-                noRepeatDays: MATCH_CONFIG.NO_REPEAT_DAYS,
-            },
+            mode: "all-available",
             insights,
         });
     } catch (error) {
@@ -383,15 +398,45 @@ exports.getMatchDetail = async (req, res) => {
     try {
         const { userId } = req.params;
         const requesterId = req.user._id;
-        const now = new Date();
 
-        await generateVisibleMatchesForUser(requesterId, { now });
-
-        const match = await Match.findOne({
+        let match = await Match.findOne({
             user: requesterId,
             matchedUser: userId,
             isDeleted: false,
         }).populate("matchedUser");
+
+        if (!match) {
+            const [requester, candidate] = await Promise.all([
+                User.findById(requesterId).lean(),
+                User.findById(userId).lean(),
+            ]);
+
+            if (!requester || !candidate) {
+                return res.status(404).json({ success: false, message: "Match profile not found." });
+            }
+
+            const oppositeGender = toOppositeGender(requester.gender);
+            if (!oppositeGender || candidate.gender !== oppositeGender) {
+                return res.status(404).json({ success: false, message: "Match profile not found." });
+            }
+
+            const { score, compatibility, reasons } = calculateScore(requester, candidate);
+
+            match = await Match.findOneAndUpdate(
+                { user: requesterId, matchedUser: userId },
+                {
+                    $set: {
+                        user: requesterId,
+                        matchedUser: userId,
+                        score,
+                        compatibility,
+                        matchReasons: reasons,
+                        isDeleted: false,
+                    },
+                },
+                { upsert: true, new: true }
+            ).populate("matchedUser");
+        }
 
         if (!match) {
             return res.status(404).json({ success: false, message: "Match profile not found." });

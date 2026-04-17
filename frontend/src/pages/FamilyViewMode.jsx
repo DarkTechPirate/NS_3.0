@@ -16,7 +16,6 @@ const FamilyViewMode = () => {
   const [matches, setMatches] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [rotationInfo, setRotationInfo] = useState(null);
   const [filters, setFilters] = useState({
     community: '',
     education: '',
@@ -31,7 +30,6 @@ const FamilyViewMode = () => {
       setError(null);
       const res = await getMatches(filters);
       setMatches(res.data || []);
-      setRotationInfo(res.rotation || null);
     } catch (err) {
       setError(err.message || "Failed to fetch matches");
       console.error("Failed to fetch matches", err);
@@ -46,15 +44,6 @@ const FamilyViewMode = () => {
 
     return () => clearInterval(intervalId);
   }, [fetchMatches]);
-
-  const getNextRefreshTime = () => {
-    if (!rotationInfo?.nextRefreshAt) return null;
-
-    return new Date(rotationInfo.nextRefreshAt).toLocaleTimeString([], {
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  };
 
   const updateFamilyReview = async (id, data) => {
     try {
@@ -125,10 +114,7 @@ const FamilyViewMode = () => {
            </button>
            <div className="text-sm text-stone-400 text-right">
              <div>{matches.length} matches found</div>
-             <div>
-               Refreshes every {rotationInfo?.intervalMinutes || 1} min
-               {getNextRefreshTime() ? ` (next: ${getNextRefreshTime()})` : ''}
-             </div>
+             <div>Showing all available profiles by gender + selected filters</div>
            </div>
         </div>
       </div>
