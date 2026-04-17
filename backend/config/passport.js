@@ -1,6 +1,14 @@
 const GoogleStrategy = require("passport-google-oauth20").Strategy;
 const User = require("../models/userModel");
 
+const normalizeEmail = (value) => String(value || "").trim().toLowerCase();
+const escapeRegex = (value) => String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+const findUserByEmail = (email) =>
+    User.findOne({
+        email: new RegExp(`^${escapeRegex(normalizeEmail(email))}$`, "i"),
+    });
+
 module.exports = (passport) => {
     // DEBUG LOGS - Run on startup
     console.log("--------------- PASSPORT CONFIG ----------------");
@@ -21,6 +29,7 @@ module.exports = (passport) => {
             async (accessToken, refreshToken, profile, done) => {
                 try {
                     console.log("--------------- GOOGLE AUTH START ---------------");
+                    const profileEmail = normalizeEmail(profile?.emails?.[0]?.value);
 
                     // Helper to get the photo URL safely
                     const googlePhoto =
@@ -36,9 +45,18 @@ module.exports = (passport) => {
                     }
 
                     // 2. Check existing user by Email (Account Linking)
-                    if (profile.emails && profile.emails.length > 0) {
-                        user = await User.findOne({ email: profile.emails[0].value });
+                    if (profileEmail) {
+                        user = await findUserByEmail(profileEmail);
                         if (user) {
+                            if (user.googleId && user.googleId !== profile.id) {
+                                return done(
+                                    new Error(
+                                        "Google account conflict: email already linked to a different Google identity."
+                                    ),
+                                    null
+                                );
+                            }
+
                             console.log("User found by Email. Linking account...");
 
                             // Link Google ID
@@ -55,20 +73,17 @@ module.exports = (passport) => {
                     }
 
                     // 3. Prepare New User Object
+                    const fallbackEmail = `google-user-${Date.now()}@local.invalid`;
+                    const finalEmail = profileEmail || fallbackEmail;
                     const newUserObj = {
                         googleId: profile.id,
-                        email:
-                            profile.emails && profile.emails[0]
-                                ? profile.emails[0].value
-                                : "no-email-" + profile.id,
+                        email: finalEmail,
 
                         fullname:
                             profile.displayName || profile.name?.givenName || "Google User",
 
                         username:
-                            profile.emails && profile.emails[0]
-                                ? profile.emails[0].value.split("@")[0]
-                                : "user" + Date.now(),
+                            finalEmail.split("@")[0],
 
                         password: "google-auth-" + Date.now(),
 

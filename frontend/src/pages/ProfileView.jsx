@@ -23,6 +23,7 @@ const ProfileView = () => {
 
     const {
         fullname,
+        email,
         gender,
         personalDetails,
         careerDetails,
@@ -37,6 +38,7 @@ const ProfileView = () => {
             data: [
                 { label: "Date of Birth", value: personalDetails?.dob ? new Date(personalDetails.dob).toLocaleDateString() : 'Not Set' },
                 { label: "Gender", value: gender || 'Not Set' },
+                { label: "Login Email", value: email || 'Not Set' },
                 { label: "Height", value: personalDetails?.height || 'Not Set' },
                 { label: "Marital Status", value: personalDetails?.maritalStatus?.replace('-', ' ') || 'Not Set' },
                 { label: "Religion", value: personalDetails?.religion || 'Not Set' },

@@ -2,6 +2,14 @@ const User = require("../models/userModel");
 const bcrypt = require("bcryptjs");
 const generateTokenAndSetCookie = require("../utils/generateToken");
 
+const normalizeEmail = (value) => String(value || "").trim().toLowerCase();
+const escapeRegex = (value) => String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+const findUserByEmail = (email) =>
+    User.findOne({
+        email: new RegExp(`^${escapeRegex(normalizeEmail(email))}$`, "i"),
+    });
+
 const toAuthResponseUser = (user) => {
     const safeUser = typeof user.toObject === "function" ? user.toObject() : { ...user };
     delete safeUser.password;
@@ -71,12 +79,13 @@ exports.Signup = async (req, res) => {
         // 1. Get Confirm Password from body
         const { fullname, username, email, password, confirmPassword, phone } =
             req.body;
+        const normalizedEmail = normalizeEmail(email);
 
         // 2. Fallback: If username is missing, generate it from email
-        const finalUsername = username || email.split("@")[0];
+        const finalUsername = username || normalizedEmail.split("@")[0];
         const finalFullname = fullname || "User"; // Fallback if name is missing
 
-        if (!email || !password || !finalUsername) {
+        if (!normalizedEmail || !password || !finalUsername) {
             return res.status(400).json({ message: "Missing required fields" });
         }
 
@@ -98,7 +107,7 @@ exports.Signup = async (req, res) => {
         }
 
         // 5. Check duplicate email
-        const existingUser = await User.findOne({ email });
+        const existingUser = await findUserByEmail(normalizedEmail);
         if (existingUser) {
             return res.status(400).json({ message: "User already exists" });
         }
@@ -110,7 +119,7 @@ exports.Signup = async (req, res) => {
         const newUser = await User.create({
             fullname: finalFullname,
             username: finalUsername,
-            email,
+            email: normalizedEmail,
             password: hashedPassword,
             phone,
         });
@@ -139,16 +148,16 @@ exports.Signup = async (req, res) => {
 // ==============================================
 exports.Login = async (req, res) => {
     try {
-        const { email, password } = req.body;
+        const loginEmail = normalizeEmail(req.body.email);
+        const password = req.body.password;
 
-        if (!email || !password) {
+        if (!loginEmail || !password) {
             return res.status(400).json({ message: "Missing fields" });
         }
 
-        const user = await User.findOne({
-            $or: [{ email }, { username: email }],
-        });
-        if (!user) return res.status(404).json({ message: "User not found" });
+        // Member login is intentionally email-only to avoid account collisions.
+        const user = await findUserByEmail(loginEmail);
+        if (!user) return res.status(404).json({ message: "No account found for this email" });
 
         // Verify Password
         const match = await bcrypt.compare(password, user.password);
@@ -179,16 +188,22 @@ exports.Login = async (req, res) => {
 exports.AdminLogin = async (req, res) => {
     try {
         const loginId = String(req.body.loginId || req.body.email || "").trim();
+        const normalizedLoginEmail = normalizeEmail(loginId);
         const password = String(req.body.password || "");
 
         if (!loginId || !password) {
             return res.status(400).json({ message: "Missing fields" });
         }
 
-        const adminUser = await User.findOne({
-            role: "admin",
-            $or: [{ email: loginId }, { username: loginId }],
-        });
+        const adminUser = loginId.includes("@")
+            ? await User.findOne({
+                role: "admin",
+                email: new RegExp(`^${escapeRegex(normalizedLoginEmail)}$`, "i"),
+            })
+            : await User.findOne({
+                role: "admin",
+                username: loginId,
+            });
 
         if (!adminUser) {
             return res.status(404).json({ message: "Admin user not found" });
@@ -253,7 +268,7 @@ exports.Me = async (req, res) => {
 // ==============================================
 exports.resetPassword = async (req, res) => {
     try {
-        const { email } = req.body;
+        const email = normalizeEmail(req.body.email);
 
         if (!email) {
             return res.status(400).json({
@@ -262,7 +277,7 @@ exports.resetPassword = async (req, res) => {
             });
         }
 
-        const user = await User.findOne({ email });
+        const user = await findUserByEmail(email);
 
         if (!user) {
             return res.status(404).json({
