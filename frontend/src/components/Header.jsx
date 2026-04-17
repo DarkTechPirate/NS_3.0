@@ -15,8 +15,16 @@ const Header = ({ variant = 'default' }) => {
 
   // Determine variant based on auth state if not explicitly passed
   const isAuth = user || variant === 'authenticated';
-  const profileComplete = isProfileComplete(user);
+  const isAdmin = user?.role === 'admin';
+  const profileComplete = isAdmin ? true : isProfileComplete(user);
   const userName = user?.fullname || 'Guest';
+  const homePath = isAuth
+    ? isAdmin
+      ? '/admin'
+      : profileComplete
+        ? '/dashboard'
+        : '/create-profile'
+    : '/';
 
   useEffect(() => {
     if (isAuth) {
@@ -59,17 +67,30 @@ const Header = ({ variant = 'default' }) => {
 
   // Navigation links based on auth state
   const navLinks = isAuth
-    ? profileComplete
+    ? isAdmin
       ? [
-        { path: '/dashboard', label: 'My Matches' },
-        { path: '/family-view', label: 'Family View' },
-        { path: '/messages', label: 'Messages' },
-        { path: '/profile', label: 'Profile' },
+        { path: '/admin?screen=profiles', label: 'Profiles' },
+        { path: '/admin?screen=matches', label: 'Matches' },
+        { path: '/admin?screen=usage', label: 'Usage' },
+        { path: '/admin?screen=logins', label: 'Logins' },
+        { path: '/admin?screen=locations', label: 'Locations' },
       ]
-      : [{ path: '/create-profile', label: 'Complete Profile' }]
+      : profileComplete
+        ? [
+          { path: '/dashboard', label: 'My Matches' },
+          { path: '/family-view', label: 'Family View' },
+          { path: '/messages', label: 'Messages' },
+          { path: '/profile', label: 'Profile' },
+        ]
+        : [{ path: '/create-profile', label: 'Complete Profile' }]
     : [];
 
-  const isActive = (path) => location.pathname === path;
+  const isActive = (path) => {
+    const [targetPath, targetQuery] = path.split('?');
+    if (location.pathname !== targetPath) return false;
+    if (!targetQuery) return true;
+    return location.search.includes(targetQuery);
+  };
 
   // Image URL Logic
   const BACKEND_URL = getBackendBaseUrl();
@@ -82,7 +103,7 @@ const Header = ({ variant = 'default' }) => {
       <div className="max-w-7xl mx-auto px-6 lg:px-8">
         <div className="flex h-16 md:h-20 items-center justify-between">
           {/* Logo */}
-          <Link to="/">
+          <Link to={homePath}>
             <Logo size="md" />
           </Link>
 
@@ -107,8 +128,8 @@ const Header = ({ variant = 'default' }) => {
             {isAuth ? (
               <>
                 <div className="hidden sm:flex bg-primary/10 text-primary px-3 py-1 rounded-full text-xs font-bold items-center gap-1">
-                  <span className="material-symbols-outlined text-sm">diamond</span>
-                  Premium
+                  <span className="material-symbols-outlined text-sm">{isAdmin ? 'shield' : 'diamond'}</span>
+                  {isAdmin ? 'Admin Mode' : 'Premium'}
                 </div>
                 
                 {/* Notification Bell */}
@@ -191,7 +212,7 @@ const Header = ({ variant = 'default' }) => {
                 >
                   <span className="material-symbols-outlined text-xl">logout</span>
                 </button>
-                <Link to={profileComplete ? '/profile' : '/create-profile'}>
+                <Link to={isAdmin ? '/admin' : (profileComplete ? '/profile' : '/create-profile')}>
                   <div
                     className="size-10 rounded-full bg-gradient-to-br from-primary to-secondary bg-center bg-cover border-2 border-white shadow-sm cursor-pointer"
                     style={userImage ? { backgroundImage: `url('${userImage}')` } : {}}

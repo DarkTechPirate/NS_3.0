@@ -20,8 +20,6 @@ const AdminLogin = () => {
 
         if (user.role === 'admin') {
             navigate('/admin', { replace: true });
-        } else {
-            navigate('/dashboard', { replace: true });
         }
     }, [user, navigate]);
 
@@ -63,6 +61,12 @@ const AdminLogin = () => {
                 {error && (
                     <div className="mb-6 bg-red-50 border border-red-100 text-red-600 text-sm p-3 rounded-lg text-center font-medium">
                         {error}
+                    </div>
+                )}
+
+                {user && user.role !== 'admin' && (
+                    <div className="mb-6 bg-blue-50 border border-blue-100 text-blue-700 text-sm p-3 rounded-lg text-center font-medium">
+                        You are currently logged in as a member. Enter admin credentials below to switch to admin mode.
                     </div>
                 )}
 

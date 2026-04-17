@@ -9,6 +9,60 @@ const toAuthResponseUser = (user) => {
     return safeUser;
 };
 
+const getPrimaryAddress = (user) => {
+    if (!Array.isArray(user?.addresses) || user.addresses.length === 0) {
+        return null;
+    }
+
+    return user.addresses.find((address) => address?.primary) || user.addresses[0] || null;
+};
+
+const getUserLocationLabel = (user) => {
+    const primaryAddress = getPrimaryAddress(user);
+    const city = user?.personalDetails?.city || primaryAddress?.city || "";
+    const state = primaryAddress?.state || "";
+
+    if (city && state) return `${city}, ${state}`;
+    if (city) return city;
+    if (state) return state;
+    return "Unknown";
+};
+
+const getRequestIp = (req) => {
+    const forwardedFor = req.headers["x-forwarded-for"];
+    const rawIp =
+        (typeof forwardedFor === "string" && forwardedFor.split(",")[0]) ||
+        req.ip ||
+        req.connection?.remoteAddress ||
+        req.socket?.remoteAddress ||
+        "unknown";
+
+    return String(rawIp).trim().replace(/^::ffff:/, "");
+};
+
+const recordLoginEvent = async (user, req) => {
+    const loginAt = new Date();
+    const loginIp = getRequestIp(req);
+    const loginLocation = getUserLocationLabel(user);
+
+    await User.findByIdAndUpdate(user._id, {
+        $inc: {
+            "loginStats.loginCount": 1,
+        },
+        $set: {
+            "loginStats.lastLoginAt": loginAt,
+            "loginStats.lastLoginIp": loginIp,
+            "loginStats.lastLoginLocation": loginLocation,
+        },
+        $push: {
+            "loginStats.recentLogins": {
+                $each: [{ at: loginAt, ip: loginIp, location: loginLocation }],
+                $slice: -20,
+            },
+        },
+    });
+};
+
 // ==============================================
 // 1. SIGNUP
 // ==============================================
@@ -63,6 +117,12 @@ exports.Signup = async (req, res) => {
 
         generateTokenAndSetCookie(res, newUser._id);
 
+        try {
+            await recordLoginEvent(newUser, req);
+        } catch (trackingError) {
+            console.error("Signup login tracking error:", trackingError.message);
+        }
+
         res.status(201).json({
             message: "Signup successful",
             user: toAuthResponseUser(newUser),
@@ -95,6 +155,12 @@ exports.Login = async (req, res) => {
 
         // Generate Token & Set Cookie
         generateTokenAndSetCookie(res, user._id);
+
+        try {
+            await recordLoginEvent(user, req);
+        } catch (trackingError) {
+            console.error("Login tracking error:", trackingError.message);
+        }
 
         res.status(200).json({
             message: "Login successful",
@@ -132,6 +198,12 @@ exports.AdminLogin = async (req, res) => {
         }
 
         generateTokenAndSetCookie(res, adminUser._id);
+
+        try {
+            await recordLoginEvent(adminUser, req);
+        } catch (trackingError) {
+            console.error("Admin login tracking error:", trackingError.message);
+        }
 
         res.status(200).json({
             message: "Admin login successful",

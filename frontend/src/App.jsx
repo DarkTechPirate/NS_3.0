@@ -20,11 +20,12 @@ import AdminDashboard from './pages/AdminDashboard';
 import AdminRoute from './components/AdminRoute';
 import { isProfileComplete } from './utils/profileCompletion';
 
-// Protected Route Component
-const ProtectedRoute = ({ children, requireCompleteProfile = false }) => {
+// Member Route Component
+const MemberRoute = ({ children, requireCompleteProfile = false }) => {
   const { user, loading } = useAuth();
   if (loading) return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
   if (!user) return <Navigate to="/login" replace />;
+  if (user.role === 'admin') return <Navigate to="/admin" replace />;
   if (requireCompleteProfile && !isProfileComplete(user)) {
     return <Navigate to="/create-profile" replace />;
   }
@@ -40,6 +41,16 @@ const PublicRoute = ({ children }) => {
       return <Navigate to="/admin" replace />;
     }
     return <Navigate to={isProfileComplete(user) ? '/dashboard' : '/create-profile'} replace />;
+  }
+  return children;
+};
+
+// Admin Login Route: allow guests and non-admin users, redirect only admins
+const AdminLoginRoute = ({ children }) => {
+  const { user, loading } = useAuth();
+  if (loading) return null;
+  if (user?.role === 'admin') {
+    return <Navigate to="/admin" replace />;
   }
   return children;
 };
@@ -64,41 +75,41 @@ function App() {
           } />
 
           <Route path="/admin-login" element={
-            <PublicRoute>
+            <AdminLoginRoute>
               <AdminLogin />
-            </PublicRoute>
+            </AdminLoginRoute>
           } />
 
           {/* Protected Routes */}
           <Route path="/dashboard" element={
-            <ProtectedRoute requireCompleteProfile>
+            <MemberRoute requireCompleteProfile>
               <MemberDashboard />
-            </ProtectedRoute>
+            </MemberRoute>
           } />
           <Route path="/family-view" element={
-            <ProtectedRoute requireCompleteProfile>
+            <MemberRoute requireCompleteProfile>
               <FamilyViewMode />
-            </ProtectedRoute>
+            </MemberRoute>
           } />
           <Route path="/match-detail/:id" element={
-            <ProtectedRoute requireCompleteProfile>
+            <MemberRoute requireCompleteProfile>
               <MatchDetailScreen />
-            </ProtectedRoute>
+            </MemberRoute>
           } />
           <Route path="/create-profile" element={
-            <ProtectedRoute>
+            <MemberRoute>
               <ProfileCreation />
-            </ProtectedRoute>
+            </MemberRoute>
           } />
           <Route path="/messages" element={
-            <ProtectedRoute requireCompleteProfile>
+            <MemberRoute requireCompleteProfile>
               <Messages />
-            </ProtectedRoute>
+            </MemberRoute>
           } />
           <Route path="/profile" element={
-            <ProtectedRoute requireCompleteProfile>
+            <MemberRoute requireCompleteProfile>
               <ProfileView />
-            </ProtectedRoute>
+            </MemberRoute>
           } />
 
           <Route path="/admin" element={

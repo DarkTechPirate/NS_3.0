@@ -95,6 +95,20 @@ const UserSchema = new Schema(
         },
 
         profileImages: [String], // Array of public URLs
+
+        loginStats: {
+            loginCount: { type: Number, default: 0 },
+            lastLoginAt: { type: Date, default: null },
+            lastLoginIp: { type: String, default: null },
+            lastLoginLocation: { type: String, default: null },
+            recentLogins: [
+                {
+                    at: { type: Date, default: Date.now },
+                    ip: { type: String, default: null },
+                    location: { type: String, default: null },
+                },
+            ],
+        },
     },
     {
         timestamps: true,

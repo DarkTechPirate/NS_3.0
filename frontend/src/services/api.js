@@ -229,6 +229,16 @@ export const getPendingAdminUsers = async () => {
     }
 };
 
+export const getAdminInsights = async () => {
+    try {
+        const response = await api.get('/admin/insights');
+        return response.data;
+    } catch (error) {
+        console.error('Fetch admin insights error:', error);
+        throw error.response?.data?.message || 'Failed to fetch admin insights';
+    }
+};
+
 export const verifyAdminUser = async (userId, isVerified) => {
     try {
         const response = await api.patch(`/admin/users/${userId}/verify`, { isVerified });

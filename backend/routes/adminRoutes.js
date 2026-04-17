@@ -5,10 +5,12 @@ const {
     getAllUsers,
     getPendingUsers,
     getUserDetail,
-    verifyUser
+    verifyUser,
+    getAdminInsights,
 } = require("../controllers/adminControllers");
 
 // All routes here require admin privileges
+router.get("/insights", protect({ admin: true }), getAdminInsights);
 router.get("/users", protect({ admin: true }), getAllUsers);
 router.get("/pending", protect({ admin: true }), getPendingUsers);
 router.get("/users/:id", protect({ admin: true }), getUserDetail);
