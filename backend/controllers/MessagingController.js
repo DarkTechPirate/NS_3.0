@@ -1,8 +1,30 @@
 const Conversation = require("../models/Conversation");
 const Message = require("../models/Message");
+const Match = require("../models/Match");
 const User = require("../models/userModel");
 const socketService = require("../services/socketService");
 const Notification = require("../models/Notification");
+
+const hasMutualInterest = async (userAId, userBId) => {
+  const [aToB, bToA] = await Promise.all([
+    Match.findOne({ user: userAId, matchedUser: userBId, isDeleted: false }).select("interestExpressed mutualInterest"),
+    Match.findOne({ user: userBId, matchedUser: userAId, isDeleted: false }).select("interestExpressed mutualInterest"),
+  ]);
+
+  return Boolean(
+    aToB &&
+    bToA &&
+    (aToB.mutualInterest || bToA.mutualInterest || (aToB.interestExpressed && bToA.interestExpressed))
+  );
+};
+
+const getConversationPeerId = (conversation, requesterId) => {
+  const peerMember = (conversation?.members || []).find(
+    (member) => member.userId.toString() !== requesterId.toString()
+  );
+
+  return peerMember?.userId || null;
+};
 
 /**
  * Get all conversations for the authenticated user
@@ -123,9 +145,29 @@ exports.sendMessage = async (req, res) => {
         _id: conversationId,
         "members.userId": senderId,
       });
+
+      if (targetConv && !targetConv.isGroup) {
+        const peerId = getConversationPeerId(targetConv, senderId);
+        const isAllowed = peerId ? await hasMutualInterest(senderId, peerId) : false;
+
+        if (!isAllowed) {
+          return res.status(403).json({
+            success: false,
+            message: "Messaging unlocks only after both users express interest.",
+          });
+        }
+      }
     } else if (recipientId) {
       if (senderId.toString() === recipientId.toString()) {
         return res.status(400).json({ success: false, message: "Cannot message yourself." });
+      }
+
+      const isAllowed = await hasMutualInterest(senderId, recipientId);
+      if (!isAllowed) {
+        return res.status(403).json({
+          success: false,
+          message: "Messaging is locked until both users express interest.",
+        });
       }
 
       // Find or create 1:1 conversation
@@ -222,6 +264,14 @@ exports.getOrCreateConversation = async (req, res) => {
 
     if (userId.toString() === recipientId.toString()) {
       return res.status(400).json({ success: false, message: "Cannot chat with yourself." });
+    }
+
+    const isAllowed = await hasMutualInterest(userId, recipientId);
+    if (!isAllowed) {
+      return res.status(403).json({
+        success: false,
+        message: "Messaging is locked until both users express interest.",
+      });
     }
 
     let conversation = await Conversation.findOne({

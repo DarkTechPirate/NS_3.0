@@ -95,7 +95,7 @@ const useMessagingStore = create((set, get) => ({
       
       get().setActiveConversation(conversation);
     } catch (error) {
-      set({ error: error.message, isLoading: false });
+      set({ error: error.response?.data?.message || error.message, isLoading: false });
     }
   },
 
@@ -157,7 +157,7 @@ const useMessagingStore = create((set, get) => ({
       
       return message;
     } catch (error) {
-      set({ error: error.message });
+      set({ error: error.response?.data?.message || error.message });
     }
   },
 

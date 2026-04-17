@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import ConversationList from '../components/ConversationList';
@@ -8,9 +9,11 @@ import { useAuth } from '../context/AuthContext';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const Messages = () => {
+    const location = useLocation();
     const { user } = useAuth();
-    const { fetchConversations, activeConversation, setActiveConversation, setUser, initSocket } = useMessagingStore();
+    const { fetchConversations, activeConversation, setActiveConversation, setUser, initSocket, startConversationWithUser } = useMessagingStore();
     const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+    const handledRecipientRef = useRef(null);
 
     // Initialize Socket.io
     useEffect(() => {
@@ -31,6 +34,24 @@ const Messages = () => {
             fetchConversations();
         }
     }, [user, setUser, fetchConversations]);
+
+    useEffect(() => {
+        if (!user) return;
+
+        const params = new URLSearchParams(location.search);
+        const recipientId = params.get('with');
+
+        if (!recipientId) {
+            handledRecipientRef.current = null;
+            return;
+        }
+
+        if (recipientId === user._id) return;
+        if (handledRecipientRef.current === recipientId) return;
+
+        handledRecipientRef.current = recipientId;
+        startConversationWithUser(recipientId);
+    }, [location.search, startConversationWithUser, user]);
 
     return (
         <div className="min-h-screen bg-background-light flex flex-col">

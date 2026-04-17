@@ -39,8 +39,17 @@ const MatchDetailScreen = () => {
     if (!match) return;
     try {
       setActionLoading(true);
-      await expressInterest(match._id);
-      alert("Interest expressed successfully!");
+      const res = await expressInterest(match._id);
+      setMatch((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          interestExpressed: true,
+          mutualInterest: res?.data?.mutualInterest || prev.mutualInterest,
+          canMessage: res?.data?.canMessage || prev.canMessage,
+        };
+      });
+      alert(res?.message || "Interest expressed successfully!");
     } catch (error) {
       console.error("Failed to express interest", error);
       alert(error || "Failed to express interest");
@@ -108,6 +117,12 @@ const MatchDetailScreen = () => {
                 </div>
                 <div className="flex flex-wrap justify-center md:justify-start gap-3 mt-5">
                   <span className="px-3 py-1 border border-line rounded text-[11px] font-bold uppercase tracking-widest text-ink-light bg-gray-50">{profile.careerDetails?.education}</span>
+                  {match.mutualInterest && (
+                    <span className="px-3 py-1 border border-emerald-200 rounded text-[11px] font-bold uppercase tracking-widest text-emerald-700 bg-emerald-50">Mutual Interest</span>
+                  )}
+                  {!match.mutualInterest && match.interestedInYou && (
+                    <span className="px-3 py-1 border border-pink-200 rounded text-[11px] font-bold uppercase tracking-widest text-pink-700 bg-pink-50">Interested In You</span>
+                  )}
                 </div>
               </div>
             </div>
@@ -115,18 +130,28 @@ const MatchDetailScreen = () => {
               <button className="h-12 w-full md:w-56 px-6 rounded-full border border-line bg-white text-ink font-bold text-sm hover:bg-gray-50 transition-all shadow-sm flex items-center justify-center">
                 Pass
               </button>
-              <button 
-                onClick={handleExpressInterest}
-                disabled={actionLoading}
-                className="h-12 w-full md:w-56 px-6 rounded-full bg-rajkumari text-white font-bold text-sm hover:bg-rajkumari/90 hover:shadow-glow-pink transition-all flex items-center justify-center gap-2 shadow-lg shadow-rajkumari/20 disabled:opacity-50"
-              >
-                {actionLoading ? (
-                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                ) : (
-                  <span className="material-symbols-outlined text-[20px]">chat_bubble</span>
-                )}
-                Express Interest
-              </button>
+              {match.canMessage ? (
+                <Link
+                  to={`/messages?with=${profile._id}`}
+                  className="h-12 w-full md:w-56 px-6 rounded-full bg-rajkumari text-white font-bold text-sm hover:bg-rajkumari/90 hover:shadow-glow-pink transition-all flex items-center justify-center gap-2 shadow-lg shadow-rajkumari/20"
+                >
+                  <span className="material-symbols-outlined text-[20px]">chat</span>
+                  Message Now
+                </Link>
+              ) : (
+                <button 
+                  onClick={handleExpressInterest}
+                  disabled={actionLoading || (match.interestExpressed && !match.interestedInYou)}
+                  className="h-12 w-full md:w-56 px-6 rounded-full bg-rajkumari text-white font-bold text-sm hover:bg-rajkumari/90 hover:shadow-glow-pink transition-all flex items-center justify-center gap-2 shadow-lg shadow-rajkumari/20 disabled:opacity-50"
+                >
+                  {actionLoading ? (
+                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                  ) : (
+                    <span className="material-symbols-outlined text-[20px]">favorite</span>
+                  )}
+                  {match.interestedInYou && !match.interestExpressed ? 'Accept Interest' : match.interestExpressed ? 'Interest Sent' : 'Express Interest'}
+                </button>
+              )}
             </div>
           </header>
 

@@ -47,10 +47,22 @@ const MemberDashboard = () => {
   const handleExpressInterest = async (matchId) => {
     try {
       setActionLoading(matchId);
-      await expressInterest(matchId);
-      // Optimistically remove from list or show success
-      setDeclinedMatches(prev => [...prev, matchId]);
-      alert("Interest expressed successfully! They have been notified.");
+      const res = await expressInterest(matchId);
+
+      setMatches((prev) =>
+        prev.map((item) => {
+          if (item._id !== matchId) return item;
+
+          return {
+            ...item,
+            interestExpressed: true,
+            mutualInterest: res?.data?.mutualInterest || item.mutualInterest,
+            canMessage: res?.data?.canMessage || item.canMessage,
+          };
+        })
+      );
+
+      alert(res?.message || "Interest expressed successfully! They have been notified.");
     } catch (error) {
       console.error("Failed to express interest:", error);
       alert(error || "Failed to express interest.");
@@ -193,6 +205,16 @@ const MemberDashboard = () => {
 
                     {/* Alignment Tags */}
                     <div className="flex flex-wrap gap-2 mb-8">
+                        {match.mutualInterest && (
+                          <span className="px-3 py-1.5 bg-emerald-50 rounded-full text-sm text-emerald-700 border border-emerald-200 font-semibold">
+                            Mutual Interest
+                          </span>
+                        )}
+                        {!match.mutualInterest && match.interestedInYou && (
+                          <span className="px-3 py-1.5 bg-pink-50 rounded-full text-sm text-pink-700 border border-pink-200 font-semibold">
+                            Interested In You
+                          </span>
+                        )}
                         <span className="px-3 py-1.5 bg-stone-50 rounded-full text-sm text-stone-600 border border-stone-100">
                           {profile.lifestyleDetails?.diet}
                         </span>
@@ -221,19 +243,28 @@ const MemberDashboard = () => {
 
                     {/* Actions - Strict Hierarchy */}
                     <div className="flex items-center gap-4 mt-auto pt-4">
-                      {/* Primary CTA */}
-                      <button 
-                        onClick={() => handleExpressInterest(match._id)}
-                        disabled={actionLoading === match._id}
-                        className="flex-1 lg:flex-none h-12 px-8 bg-primary hover:bg-primary/90 text-white rounded-full font-semibold text-sm transition-all shadow-sm flex items-center justify-center gap-2 disabled:opacity-50"
-                      >
-                        {actionLoading === match._id ? (
-                          <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                        ) : (
-                          <span className="material-symbols-outlined text-lg">favorite</span>
-                        )}
-                        Express Interest
-                      </button>
+                      {match.canMessage ? (
+                        <Link
+                          to={`/messages?with=${profile._id}`}
+                          className="flex-1 lg:flex-none h-12 px-8 bg-primary hover:bg-primary/90 text-white rounded-full font-semibold text-sm transition-all shadow-sm flex items-center justify-center gap-2"
+                        >
+                          <span className="material-symbols-outlined text-lg">chat</span>
+                          Message Now
+                        </Link>
+                      ) : (
+                        <button
+                          onClick={() => handleExpressInterest(match._id)}
+                          disabled={actionLoading === match._id || (match.interestExpressed && !match.interestedInYou)}
+                          className="flex-1 lg:flex-none h-12 px-8 bg-primary hover:bg-primary/90 text-white rounded-full font-semibold text-sm transition-all shadow-sm flex items-center justify-center gap-2 disabled:opacity-50"
+                        >
+                          {actionLoading === match._id ? (
+                            <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                          ) : (
+                            <span className="material-symbols-outlined text-lg">favorite</span>
+                          )}
+                          {match.interestedInYou && !match.interestExpressed ? 'Accept Interest' : match.interestExpressed ? 'Interest Sent' : 'Express Interest'}
+                        </button>
+                      )}
 
                       {/* Secondary CTA */}
                       <Link

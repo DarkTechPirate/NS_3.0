@@ -4,6 +4,7 @@ const Notification = require("../models/Notification");
 const socketService = require("../services/socketService");
 const mongoose = require("mongoose");
 const {
+    calculateScore,
     generateVisibleMatchesForUser,
     getCycleKey,
     getNextRefreshAt,
@@ -31,15 +32,15 @@ exports.getMatches = async (req, res) => {
 
         const cycleKey = getCycleKey(now);
 
+        const requesterObjectId = new mongoose.Types.ObjectId(userId);
+
         // Build filtering for the matched user's details
         const matchFilter = {
-            user: new mongoose.Types.ObjectId(userId),
+            user: requesterObjectId,
             isDeleted: false,
-            visibleInCycle: true,
-            cycleKey,
         };
 
-        // Aggregation to join with user details and filter
+        // Aggregation to join with user details and relationship state
         const pipeline = [
             { $match: matchFilter },
             {
@@ -50,7 +51,78 @@ exports.getMatches = async (req, res) => {
                     as: "matchedUserDetails"
                 }
             },
-            { $unwind: "$matchedUserDetails" }
+            { $unwind: "$matchedUserDetails" },
+            {
+                $lookup: {
+                    from: "matches",
+                    let: { matchedUserId: "$matchedUser" },
+                    pipeline: [
+                        {
+                            $match: {
+                                $expr: {
+                                    $and: [
+                                        { $eq: ["$user", "$$matchedUserId"] },
+                                        { $eq: ["$matchedUser", requesterObjectId] },
+                                        { $ne: ["$isDeleted", true] },
+                                    ],
+                                },
+                            },
+                        },
+                        {
+                            $project: {
+                                interestExpressed: 1,
+                                mutualInterest: 1,
+                            },
+                        },
+                    ],
+                    as: "reverseMatch",
+                },
+            },
+            {
+                $addFields: {
+                    interestExpressed: { $ifNull: ["$interestExpressed", false] },
+                    interestedInYou: {
+                        $ifNull: [{ $arrayElemAt: ["$reverseMatch.interestExpressed", 0] }, false],
+                    },
+                    reverseMutualInterest: {
+                        $ifNull: [{ $arrayElemAt: ["$reverseMatch.mutualInterest", 0] }, false],
+                    },
+                    isCurrentCycle: {
+                        $and: [
+                            { $eq: ["$visibleInCycle", true] },
+                            { $eq: ["$cycleKey", cycleKey] },
+                        ],
+                    },
+                },
+            },
+            {
+                $addFields: {
+                    mutualInterest: {
+                        $or: [
+                            { $ifNull: ["$mutualInterest", false] },
+                            "$reverseMutualInterest",
+                            {
+                                $and: ["$interestExpressed", "$interestedInYou"],
+                            },
+                        ],
+                    },
+                },
+            },
+            {
+                $addFields: {
+                    canMessage: "$mutualInterest",
+                },
+            },
+            {
+                $match: {
+                    $or: [
+                        { isCurrentCycle: true },
+                        { interestExpressed: true },
+                        { interestedInYou: true },
+                        { mutualInterest: true },
+                    ],
+                },
+            },
         ];
 
         // Apply filters to joined user data
@@ -79,8 +151,22 @@ exports.getMatches = async (req, res) => {
             pipeline.push({ $match: dynamicFilters });
         }
 
-        // Sort by score descending
-        pipeline.push({ $sort: { score: -1 } });
+        // Prioritize mutual/incoming interest, then current cycle and score.
+        pipeline.push({
+            $sort: {
+                mutualInterest: -1,
+                interestedInYou: -1,
+                interestExpressed: -1,
+                isCurrentCycle: -1,
+                score: -1,
+            },
+        });
+        pipeline.push({
+            $project: {
+                reverseMatch: 0,
+                reverseMutualInterest: 0,
+            },
+        });
         pipeline.push({ $limit: MATCH_CONFIG.MAX_VISIBLE_MATCHES });
 
         const matches = await Match.aggregate(pipeline);
@@ -166,30 +252,122 @@ exports.expressInterest = async (req, res) => {
     try {
         const matchId = req.params.id;
         const senderId = req.user._id;
+        const now = new Date();
 
-        const match = await Match.findOne({ _id: matchId, user: senderId }).populate("matchedUser");
+        const match = await Match.findOne({ _id: matchId, user: senderId, isDeleted: false }).populate("matchedUser");
         if (!match) {
             return res.status(404).json({ success: false, message: "Match not found." });
         }
 
         const recipientId = match.matchedUser._id;
+        const senderUser = await User.findById(senderId).lean();
+        const recipientUser = await User.findById(recipientId).lean();
 
-        // Create Notification for the recipient
-        await Notification.create({
-            recipient: recipientId,
-            sender: senderId,
-            type: 'INTEREST',
-            message: `${req.user.fullname} has expressed interest in your profile!`,
-            link: `/match-detail?id=${senderId}`
+        if (!senderUser || !recipientUser) {
+            return res.status(404).json({ success: false, message: "User not found." });
+        }
+
+        let reverseMatch = await Match.findOne({
+            user: recipientId,
+            matchedUser: senderId,
         });
 
-        // Notify via socket for the bell icon
-        socketService.notifyUser(recipientId.toString(), "NEW_NOTIFICATION", {
-            type: 'INTEREST',
-            message: `${req.user.fullname} expressed interest!`
-        });
+        if (!reverseMatch) {
+            const reverseScoreData = calculateScore(recipientUser, senderUser);
+            reverseMatch = await Match.create({
+                user: recipientId,
+                matchedUser: senderId,
+                score: reverseScoreData.score,
+                compatibility: reverseScoreData.compatibility,
+                matchReasons: reverseScoreData.reasons,
+                isDeleted: false,
+                visibleInCycle: false,
+                cycleKey: null,
+                lastShownAt: now,
+            });
+        } else if (reverseMatch.isDeleted) {
+            reverseMatch.isDeleted = false;
+            await reverseMatch.save();
+        }
 
-        res.status(200).json({ success: true, message: "Interest expressed successfully." });
+        const wasMutualBefore = Boolean(match.mutualInterest) || Boolean(reverseMatch.mutualInterest);
+        const wasAlreadyExpressed = Boolean(match.interestExpressed);
+
+        match.interestExpressed = true;
+        if (!match.interestExpressedAt) {
+            match.interestExpressedAt = now;
+        }
+
+        const isMutualNow = Boolean(reverseMatch.interestExpressed) || Boolean(reverseMatch.mutualInterest);
+
+        if (isMutualNow) {
+            match.mutualInterest = true;
+            match.mutualInterestAt = match.mutualInterestAt || now;
+
+            reverseMatch.mutualInterest = true;
+            reverseMatch.mutualInterestAt = reverseMatch.mutualInterestAt || now;
+            await reverseMatch.save();
+        }
+
+        await match.save();
+
+        if (!isMutualNow && !wasAlreadyExpressed) {
+            await Notification.create({
+                recipient: recipientId,
+                sender: senderId,
+                type: "INTEREST",
+                message: `${req.user.fullname} has expressed interest in your profile!`,
+                link: `/match-detail/${senderId}`,
+            });
+
+            socketService.notifyUser(recipientId.toString(), "NEW_NOTIFICATION", {
+                type: "INTEREST",
+                message: `${req.user.fullname} expressed interest!`,
+            });
+        }
+
+        if (isMutualNow && !wasMutualBefore) {
+            await Notification.insertMany([
+                {
+                    recipient: senderId,
+                    sender: recipientId,
+                    type: "INTEREST",
+                    message: `It's a mutual match with ${match.matchedUser.fullname}. You can now message each other.`,
+                    link: `/messages?with=${recipientId}`,
+                },
+                {
+                    recipient: recipientId,
+                    sender: senderId,
+                    type: "INTEREST",
+                    message: `It's a mutual match with ${senderUser.fullname}. You can now message each other.`,
+                    link: `/messages?with=${senderId}`,
+                },
+            ]);
+
+            socketService.notifyUser(senderId.toString(), "NEW_NOTIFICATION", {
+                type: "INTEREST",
+                message: `Mutual interest confirmed with ${match.matchedUser.fullname}. Messaging is unlocked.`,
+            });
+
+            socketService.notifyUser(recipientId.toString(), "NEW_NOTIFICATION", {
+                type: "INTEREST",
+                message: `Mutual interest confirmed with ${senderUser.fullname}. Messaging is unlocked.`,
+            });
+        }
+
+        res.status(200).json({
+            success: true,
+            message: isMutualNow
+                ? "Mutual interest confirmed. Messaging is now enabled."
+                : wasAlreadyExpressed
+                    ? "Interest already sent. Waiting for the other user to respond."
+                : "Interest expressed successfully. The other user has been notified.",
+            data: {
+                interestExpressed: true,
+                mutualInterest: isMutualNow,
+                canMessage: isMutualNow,
+            },
+        });
     } catch (error) {
         console.error(`[MatchController] expressInterest Error: ${error.message}`);
         res.status(500).json({ success: false, message: "Failed to express interest." });
@@ -209,24 +387,38 @@ exports.getMatchDetail = async (req, res) => {
 
         await generateVisibleMatchesForUser(requesterId, { now });
 
-        const cycleKey = getCycleKey(now);
-
-        // Only allow detail view for the currently visible rotating set.
-        const match = await Match.findOne({ 
-            user: requesterId, 
+        const match = await Match.findOne({
+            user: requesterId,
             matchedUser: userId,
             isDeleted: false,
-            visibleInCycle: true,
-            cycleKey,
         }).populate("matchedUser");
 
         if (!match) {
             return res.status(404).json({ success: false, message: "Match profile not found." });
         }
 
+        const reverseMatch = await Match.findOne({
+            user: userId,
+            matchedUser: requesterId,
+            isDeleted: false,
+        }).select("interestExpressed mutualInterest");
+
+        const interestedInYou = Boolean(reverseMatch?.interestExpressed);
+        const mutualInterest =
+            Boolean(match.mutualInterest) ||
+            Boolean(reverseMatch?.mutualInterest) ||
+            (Boolean(match.interestExpressed) && interestedInYou);
+
+        const responseData = {
+            ...match.toObject(),
+            interestedInYou,
+            mutualInterest,
+            canMessage: mutualInterest,
+        };
+
         res.status(200).json({
             success: true,
-            data: match
+            data: responseData,
         });
     } catch (error) {
         console.error(`[MatchController] getMatchDetail Error: ${error.message}`);

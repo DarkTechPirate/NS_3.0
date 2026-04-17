@@ -23,6 +23,22 @@ const MatchSchema = new mongoose.Schema({
   matchReasons: [{
     type: String,
   }],
+  interestExpressed: {
+    type: Boolean,
+    default: false,
+  },
+  interestExpressedAt: {
+    type: Date,
+    default: null,
+  },
+  mutualInterest: {
+    type: Boolean,
+    default: false,
+  },
+  mutualInterestAt: {
+    type: Date,
+    default: null,
+  },
   isDeleted: {
     type: Boolean,
     default: false,

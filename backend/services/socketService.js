@@ -1,6 +1,20 @@
 const Message = require('../models/Message');
 const Conversation = require('../models/Conversation');
+const Match = require('../models/Match');
 const User = require('../models/userModel');
+
+const hasMutualInterest = async (userAId, userBId) => {
+  const [aToB, bToA] = await Promise.all([
+    Match.findOne({ user: userAId, matchedUser: userBId, isDeleted: false }).select('interestExpressed mutualInterest'),
+    Match.findOne({ user: userBId, matchedUser: userAId, isDeleted: false }).select('interestExpressed mutualInterest'),
+  ]);
+
+  return Boolean(
+    aToB &&
+    bToA &&
+    (aToB.mutualInterest || bToA.mutualInterest || (aToB.interestExpressed && bToA.interestExpressed))
+  );
+};
 
 class SocketService {
   constructor() {
@@ -48,6 +62,16 @@ class SocketService {
 
           if (!targetConv) {
             return socket.emit('error', { message: 'Conversation not found or access denied' });
+          }
+
+          if (!targetConv.isGroup) {
+            const peerMember = targetConv.members.find((member) => member.userId.toString() !== userId);
+            const peerId = peerMember?.userId;
+            const isAllowed = peerId ? await hasMutualInterest(userId, peerId) : false;
+
+            if (!isAllowed) {
+              return socket.emit('error', { message: 'Messaging unlocks only after both users express interest.' });
+            }
           }
 
           // Save message to database
