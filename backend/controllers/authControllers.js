@@ -115,7 +115,7 @@ exports.Signup = async (req, res) => {
             phone,
         });
 
-        generateTokenAndSetCookie(res, newUser._id);
+        const token = generateTokenAndSetCookie(res, newUser._id);
 
         try {
             await recordLoginEvent(newUser, req);
@@ -126,6 +126,7 @@ exports.Signup = async (req, res) => {
         res.status(201).json({
             message: "Signup successful",
             user: toAuthResponseUser(newUser),
+            token,
         });
     } catch (error) {
         console.error("Signup Error:", error);
@@ -154,7 +155,7 @@ exports.Login = async (req, res) => {
         if (!match) return res.status(401).json({ message: "Invalid credentials" });
 
         // Generate Token & Set Cookie
-        generateTokenAndSetCookie(res, user._id);
+        const token = generateTokenAndSetCookie(res, user._id);
 
         try {
             await recordLoginEvent(user, req);
@@ -165,6 +166,7 @@ exports.Login = async (req, res) => {
         res.status(200).json({
             message: "Login successful",
             user: toAuthResponseUser(user),
+            token,
         });
     } catch (error) {
         res.status(500).json({ message: error.message });
@@ -197,7 +199,7 @@ exports.AdminLogin = async (req, res) => {
             return res.status(401).json({ message: "Invalid credentials" });
         }
 
-        generateTokenAndSetCookie(res, adminUser._id);
+        const token = generateTokenAndSetCookie(res, adminUser._id);
 
         try {
             await recordLoginEvent(adminUser, req);
@@ -208,6 +210,7 @@ exports.AdminLogin = async (req, res) => {
         res.status(200).json({
             message: "Admin login successful",
             user: toAuthResponseUser(adminUser),
+            token,
         });
     } catch (error) {
         console.error("Admin Login Error:", error);
@@ -236,9 +239,12 @@ exports.Me = async (req, res) => {
         .findById(req.user._id)
         .select("-password -__v -updatedAt");
 
+    const token = generateTokenAndSetCookie.generateToken(req.user._id);
+
     res.status(200).json({
         success: true,
         user,
+        token,
     });
 };
 

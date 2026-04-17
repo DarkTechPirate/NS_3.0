@@ -9,15 +9,65 @@ const normalizeApiBaseUrl = (url) => {
 const API_URL = normalizeApiBaseUrl(import.meta.env.VITE_API_URL || 'http://localhost:5000/api');
 export const GOOGLE_AUTH_URL = `${API_URL}/auth/google`;
 
+const TAB_AUTH_TOKEN_KEY = 'ns.tab.auth.token';
+const TAB_AUTH_USER_KEY = 'ns.tab.auth.user';
+
+const hasWindow = () => typeof window !== 'undefined';
+
+export const getTabAuthToken = () => {
+    if (!hasWindow()) return null;
+    return window.sessionStorage.getItem(TAB_AUTH_TOKEN_KEY);
+};
+
+export const getTabAuthUser = () => {
+    if (!hasWindow()) return null;
+    const raw = window.sessionStorage.getItem(TAB_AUTH_USER_KEY);
+    if (!raw) return null;
+
+    try {
+        return JSON.parse(raw);
+    } catch {
+        return null;
+    }
+};
+
+export const persistTabAuthSession = ({ token, user }) => {
+    if (!hasWindow()) return;
+
+    if (token) {
+        window.sessionStorage.setItem(TAB_AUTH_TOKEN_KEY, token);
+    }
+
+    if (user) {
+        window.sessionStorage.setItem(TAB_AUTH_USER_KEY, JSON.stringify(user));
+    }
+};
+
+export const clearTabAuthSession = () => {
+    if (!hasWindow()) return;
+    window.sessionStorage.removeItem(TAB_AUTH_TOKEN_KEY);
+    window.sessionStorage.removeItem(TAB_AUTH_USER_KEY);
+};
+
 const api = axios.create({
     baseURL: API_URL,
     withCredentials: true, // Important for cookies
+});
+
+api.interceptors.request.use((config) => {
+    const token = getTabAuthToken();
+    if (!token) return config;
+
+    config.headers = config.headers || {};
+    config.headers.Authorization = `Bearer ${token}`;
+    return config;
 });
 
 // Auth API Calls
 export const loginUser = async (email, password) => {
     try {
         const response = await api.post('/auth/login', { email, password });
+        persistTabAuthSession({ token: response.data.token, user: response.data.user });
         return { success: true, user: response.data.user };
     } catch (error) {
         return {
@@ -30,6 +80,7 @@ export const loginUser = async (email, password) => {
 export const adminLoginUser = async (loginId, password) => {
     try {
         const response = await api.post('/auth/admin/login', { loginId, password });
+        persistTabAuthSession({ token: response.data.token, user: response.data.user });
         return { success: true, user: response.data.user };
     } catch (error) {
         return {
@@ -47,6 +98,7 @@ export const SignUp = async (fullname, email, password, confirmPassword) => {
             password,
             confirmPassword,
         });
+        persistTabAuthSession({ token: response.data.token, user: response.data.user });
         return { success: true, user: response.data.user };
     } catch (error) {
         return {
@@ -59,9 +111,11 @@ export const SignUp = async (fullname, email, password, confirmPassword) => {
 export const logoutUser = async () => {
     try {
         const response = await api.get('/auth/logout');
+        clearTabAuthSession();
         return response.data;
     } catch (error) {
         console.error('Logout error:', error);
+        clearTabAuthSession();
         return { success: false };
     }
 };
@@ -69,8 +123,10 @@ export const logoutUser = async () => {
 export const checkAuth = async () => {
     try {
         const response = await api.get('/auth/me');
+        persistTabAuthSession({ token: response.data.token, user: response.data.user });
         return { success: true, user: response.data.user };
     } catch (error) {
+        clearTabAuthSession();
         return { success: false };
     }
 };
@@ -89,9 +145,7 @@ export const uploadProfileImage = async (file) => {
     try {
         const formData = new FormData();
         formData.append('image', file);
-        const response = await axios.post(`${API_URL}/profile/profile-image`, formData, {
-            withCredentials: true,
-        });
+        const response = await api.post('/profile/profile-image', formData);
         return response.data;
     } catch (error) {
         throw error.response?.data?.message || 'Upload failed';

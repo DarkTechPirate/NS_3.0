@@ -78,12 +78,13 @@ router.post("/google/onetap", async (req, res) => {
         const user = await findOrCreateGoogleUser(payload);
 
         // C. Set the Cookie (CRITICAL: Matches your existing auth logic)
-        generateTokenAndSetCookie(res, user._id);
+        const appToken = generateTokenAndSetCookie(res, user._id);
 
         // D. Respond with User Data (Frontend updates state immediately)
         res.status(200).json({
             success: true,
             user,
+            token: appToken,
             message: "Google One Tap Login Successful",
         });
     } catch (error) {

@@ -7,8 +7,13 @@ const protect =
     ({ admin = false, staff = false } = {}) =>
         async (req, res, next) => {
             try {
-                // 2. Read token from cookie
-                const token = req.cookies.token;
+                // 2. Read token from Authorization header first (tab-pinned), then cookie fallback
+                const authHeader = req.headers.authorization || "";
+                const headerToken = authHeader.startsWith("Bearer ")
+                    ? authHeader.slice(7).trim()
+                    : null;
+
+                const token = headerToken || req.cookies.token;
 
                 if (!token) {
                     return res.status(401).json({ message: "Not authorized, no token" });
@@ -48,7 +53,8 @@ const protect =
                 const sevenDaysInSeconds = 7 * 24 * 60 * 60;
                 const timeRemaining = decoded.exp - nowInSeconds;
 
-                if (timeRemaining < sevenDaysInSeconds) {
+                // Refresh cookie only for cookie-auth sessions, so one tab doesn't overwrite another.
+                if (timeRemaining < sevenDaysInSeconds && !headerToken) {
                     generateTokenAndSetCookie(res, req.user._id);
                 }
 

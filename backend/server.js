@@ -161,8 +161,9 @@ const User = require('./models/userModel');
 
 io.use(async (socket, next) => {
   try {
+    const authToken = socket.handshake.auth?.token;
     const cookies = cookie.parse(socket.handshake.headers.cookie || '');
-    const token = cookies.token;
+    const token = authToken || cookies.token;
 
     if (!token) {
       return next(new Error('Authentication error: No token provided'));

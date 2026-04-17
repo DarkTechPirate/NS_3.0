@@ -1,9 +1,21 @@
 import { create } from "zustand";
 import axios from "axios";
 import { io } from "socket.io-client";
+import { getTabAuthToken } from "../services/api";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || "http://localhost:5000";
+
+const getAuthConfig = () => {
+  const token = getTabAuthToken();
+  const config = { withCredentials: true };
+
+  if (token) {
+    config.headers = { Authorization: `Bearer ${token}` };
+  }
+
+  return config;
+};
 
 const useMessagingStore = create((set, get) => ({
   conversations: [],
@@ -19,9 +31,12 @@ const useMessagingStore = create((set, get) => ({
   initSocket: (user) => {
     if (get().socket || !user) return;
 
+    const tabToken = getTabAuthToken();
+
     const socket = io(SOCKET_URL, {
       withCredentials: true,
       autoConnect: true,
+      auth: tabToken ? { token: tabToken } : {},
     });
 
     socket.on("connect", () => {
@@ -75,7 +90,7 @@ const useMessagingStore = create((set, get) => ({
   fetchConversations: async () => {
     set({ isLoading: true });
     try {
-      const res = await axios.get(`${API_URL}/messaging/conversations`, { withCredentials: true });
+      const res = await axios.get(`${API_URL}/messaging/conversations`, getAuthConfig());
       set({ conversations: res.data.data, isLoading: false });
     } catch (error) {
       set({ error: error.message, isLoading: false });
@@ -85,7 +100,11 @@ const useMessagingStore = create((set, get) => ({
   startConversationWithUser: async (userId) => {
     set({ isLoading: true });
     try {
-      const res = await axios.post(`${API_URL}/messaging/conversations/get-or-create`, { recipientId: userId }, { withCredentials: true });
+      const res = await axios.post(
+        `${API_URL}/messaging/conversations/get-or-create`,
+        { recipientId: userId },
+        getAuthConfig()
+      );
       const conversation = res.data.data;
       
       const { conversations } = get();
@@ -115,7 +134,7 @@ const useMessagingStore = create((set, get) => ({
     }
 
     try {
-      const res = await axios.get(`${API_URL}/messaging/conversations/${conversation.id}/messages`, { withCredentials: true });
+      const res = await axios.get(`${API_URL}/messaging/conversations/${conversation.id}/messages`, getAuthConfig());
       set({ messages: res.data.data, isLoading: false });
       
       // Mark as read
@@ -140,13 +159,17 @@ const useMessagingStore = create((set, get) => ({
 
     // Fallback to REST for files/complex messages
     try {
-      const res = await axios.post(`${API_URL}/messaging/messages`, {
-        conversationId: activeConversation?.id,
-        recipientId,
-        content,
-        attachments,
-        metadata,
-      }, { withCredentials: true });
+      const res = await axios.post(
+        `${API_URL}/messaging/messages`,
+        {
+          conversationId: activeConversation?.id,
+          recipientId,
+          content,
+          attachments,
+          metadata,
+        },
+        getAuthConfig()
+      );
       
       const message = res.data.data;
       get().addMessage(message);
@@ -183,7 +206,7 @@ const useMessagingStore = create((set, get) => ({
 
   markAsRead: async (conversationId) => {
     try {
-      await axios.put(`${API_URL}/messaging/conversations/${conversationId}/read`, {}, { withCredentials: true });
+      await axios.put(`${API_URL}/messaging/conversations/${conversationId}/read`, {}, getAuthConfig());
       set((state) => ({
         messages: state.messages.map((msg) =>
           msg.senderId !== state.user?._id ? { ...msg, isRead: true } : msg
@@ -227,10 +250,14 @@ const useMessagingStore = create((set, get) => ({
     try {
       const formData = new FormData();
       formData.append("file", file);
+      const authConfig = getAuthConfig();
       
       const res = await axios.post(`${API_URL}/messaging/messages/upload`, formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-        withCredentials: true
+        ...authConfig,
+        headers: {
+          ...(authConfig.headers || {}),
+          "Content-Type": "multipart/form-data",
+        },
       });
       
       return res.data.data;
