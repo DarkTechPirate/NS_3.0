@@ -124,12 +124,6 @@ const ProfileCreation = () => {
     }
   }, [user, initUserRef]);
 
-  React.useEffect(() => {
-    if (user && isProfileComplete(user)) {
-      navigate('/dashboard', { replace: true });
-    }
-  }, [user, navigate]);
-
   // Comprehensive Indian Religion, Community, and Caste Data
   const religions = [
     'Hindu',
