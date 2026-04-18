@@ -21,6 +21,7 @@ const ProfileCreation = () => {
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState({}); // { fieldName: progress }
   const [previewImage, setPreviewImage] = useState(null); // Full size preview modal
+  const [isUpdateMode, setIsUpdateMode] = useState(false); // Track if user is updating existing profile
   const [formData, setFormData] = useState({
     // Personal Overview
     firstName: '',
@@ -120,6 +121,17 @@ const ProfileCreation = () => {
         // Photos
         photos: user.profileImages?.length ? user.profileImages : (user.profilePicture ? [user.profilePicture] : []),
       }));
+
+      // Check if user has existing profile data (is an update)
+      const hasExistingProfile = !!(
+        user.personalDetails?.dob ||
+        user.careerDetails?.profession ||
+        user.familyDetails?.fatherName ||
+        user.lifestyleDetails?.diet ||
+        user.profileImages?.length
+      );
+      setIsUpdateMode(hasExistingProfile);
+
       setInitUserRef(user._id);
     }
   }, [user, initUserRef]);
@@ -227,7 +239,9 @@ const ProfileCreation = () => {
     { id: 'values', label: 'Values & Lifestyle', icon: 'favorite', status: 'required' },
     { id: 'portfolio', label: 'Visual Portfolio', icon: 'photo_library', status: 'pending' }
   ];
-  const completionProgress = getProfileCompletionFromForm(formData);
+
+  // Progress bar shows 100% ONLY when all fields are completely filled
+  const completionProgress = isProfileComplete(user) ? 100 : getProfileCompletionFromForm(formData);
 
   const handleInputChange = (field, value) => {
     setFormData((prev) => {
@@ -1296,6 +1310,13 @@ const ProfileCreation = () => {
 
         setUser(nextUser);
 
+        // If in update mode, just save and show success
+        if (isUpdateMode) {
+          alert('Profile updated successfully.');
+          return;
+        }
+
+        // First-time mode: linear flow
         if (isDraft) {
           alert('Draft saved successfully.');
           return;
@@ -1364,26 +1385,32 @@ const ProfileCreation = () => {
             </div>
             <nav className="flex flex-col gap-2">
               <div className="text-xs font-bold tracking-widest text-slate-grey/50 uppercase mb-2 pl-3">Sections</div>
-              {sections.map((section) => (
-                <button
-                  key={section.id}
-                  onClick={() => setActiveSection(section.id)}
-                  className={`flex items-center gap-3 px-4 py-3 rounded-full transition-all group text-left w-full ${activeSection === section.id
-                    ? 'bg-white border border-rajkumari/20 shadow-soft'
-                    : 'hover:bg-white/60 opacity-70 hover:opacity-100'
-                    }`}
-                >
-                  <span className={`material-symbols-outlined text-[20px] ${activeSection === section.id ? 'text-rajkumari' : 'text-slate-grey group-hover:text-rajkumari'
-                    }`}>{section.icon}</span>
-                  <div className="flex flex-col">
-                    <span className={`text-sm ${activeSection === section.id ? 'font-semibold text-charcoal' : 'font-medium text-slate-grey group-hover:text-charcoal'
-                      }`}>{section.label}</span>
-                    {section.id === 'personal' && activeSection === 'personal' && (
-                      <span className="text-ghee text-[10px] font-bold uppercase tracking-wide">In Progress</span>
-                    )}
-                  </div>
-                </button>
-              ))}
+              {sections.map((section, index) => {
+                // In first-time mode, disable sections that come after current
+                const canNavigate = isUpdateMode || index <= sections.findIndex(s => s.id === activeSection) || activeSection === 'portfolio';
+
+                return (
+                  <button
+                    key={section.id}
+                    onClick={() => canNavigate && setActiveSection(section.id)}
+                    disabled={!canNavigate}
+                    className={`flex items-center gap-3 px-4 py-3 rounded-full transition-all group text-left w-full ${activeSection === section.id
+                      ? 'bg-white border border-rajkumari/20 shadow-soft'
+                      : canNavigate ? 'hover:bg-white/60 opacity-70 hover:opacity-100' : 'opacity-40 cursor-not-allowed'
+                      }`}
+                  >
+                    <span className={`material-symbols-outlined text-[20px] ${activeSection === section.id ? 'text-rajkumari' : 'text-slate-grey group-hover:text-rajkumari'
+                      }`}>{section.icon}</span>
+                    <div className="flex flex-col">
+                      <span className={`text-sm ${activeSection === section.id ? 'font-semibold text-charcoal' : 'font-medium text-slate-grey group-hover:text-charcoal'
+                        }`}>{section.label}</span>
+                      {section.id === 'personal' && activeSection === 'personal' && !isUpdateMode && (
+                        <span className="text-ghee text-[10px] font-bold uppercase tracking-wide">In Progress</span>
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
             </nav>
           </div>
           <div className="mt-auto pt-8 flex items-center gap-3 opacity-70">
@@ -1420,13 +1447,15 @@ const ProfileCreation = () => {
               Save Draft
             </button>
             <div className="flex items-center gap-3">
-              {activeSection !== 'personal' && (
+              {/* Show Previous button in both modes, but only if not first section OR in update mode */}
+              {(isUpdateMode || activeSection !== 'personal') && (
                 <button
                   onClick={() => {
                     const currentIndex = sections.findIndex(s => s.id === activeSection);
                     if (currentIndex > 0) setActiveSection(sections[currentIndex - 1].id);
                   }}
-                  className="text-slate-grey hover:text-charcoal text-sm font-medium px-4 py-2 rounded-full hover:bg-stone-100 transition-colors flex items-center gap-1"
+                  disabled={!isUpdateMode && activeSection === 'personal'}
+                  className="text-slate-grey hover:text-charcoal text-sm font-medium px-4 py-2 rounded-full hover:bg-stone-100 transition-colors flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <span className="material-symbols-outlined text-[18px]">arrow_back</span>
                   Previous
@@ -1437,8 +1466,23 @@ const ProfileCreation = () => {
                 disabled={uploading}
                 className="bg-rajkumari text-white hover:bg-[#B01E50] px-8 py-3 rounded-full text-sm font-bold tracking-wide transition-all transform hover:scale-105 shadow-[0_4px_14px_rgba(209,46,104,0.4)] flex items-center gap-2 disabled:opacity-70"
               >
-                {activeSection === 'portfolio' ? 'Submit Profile' : 'Continue'}
-                <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
+                {/* Show different button text based on mode and section */}
+                {isUpdateMode ? (
+                  <>
+                    Save Changes
+                    <span className="material-symbols-outlined text-[18px]">check</span>
+                  </>
+                ) : activeSection === 'portfolio' ? (
+                  <>
+                    Submit Profile
+                    <span className="material-symbols-outlined text-[18px]">check</span>
+                  </>
+                ) : (
+                  <>
+                    Continue
+                    <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
+                  </>
+                )}
               </button>
             </div>
           </div>
