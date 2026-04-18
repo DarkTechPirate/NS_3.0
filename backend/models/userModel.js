@@ -53,8 +53,19 @@ const UserSchema = new Schema(
             height: String,
             maritalStatus: String,
             religion: String,
-            community: String,
-            caste: String,
+            community: {
+                type: String,
+                enum: [
+                    "General",
+                    "OBC",
+                    "SC",
+                    "ST",
+                    "EBC",
+                    "SEBC",
+                    "EWS"
+                ]
+            },
+            subCaste: String,
             motherTongue: String,
             city: String,
             about: String,

@@ -43,6 +43,7 @@ const ProfileView = () => {
                 { label: "Marital Status", value: personalDetails?.maritalStatus?.replace('-', ' ') || 'Not Set' },
                 { label: "Religion", value: personalDetails?.religion || 'Not Set' },
                 { label: "Community", value: personalDetails?.community || 'Not Set' },
+                { label: "Sub-Caste", value: personalDetails?.subCaste || 'Not Set' },
                 { label: "Mother Tongue", value: personalDetails?.motherTongue || 'Not Set' },
                 { label: "City", value: personalDetails?.city || user.addresses?.[0]?.city || 'Not Set' },
             ]

@@ -35,7 +35,7 @@ const ProfileCreation = () => {
     maritalStatus: 'never-married',
     religion: '',
     community: '',
-    caste: '',
+    subCaste: '',
     motherTongue: '',
     jathagam: null,
     // Education & Career
@@ -84,7 +84,7 @@ const ProfileCreation = () => {
         maritalStatus: user.personalDetails?.maritalStatus || 'never-married',
         religion: user.personalDetails?.religion || '',
         community: user.personalDetails?.community || '',
-        caste: user.personalDetails?.caste || '',
+        subCaste: user.personalDetails?.subCaste || '',
         motherTongue: user.personalDetails?.motherTongue || '',
         aboutText: user.personalDetails?.about || '',
         jathagam: user.personalDetails?.jathagam || null,
@@ -246,11 +246,11 @@ const ProfileCreation = () => {
   const handleInputChange = (field, value) => {
     setFormData((prev) => {
       if (field === 'religion') {
-        return { ...prev, religion: value, community: '', caste: '' };
+        return { ...prev, religion: value, community: '', subCaste: '' };
       }
 
       if (field === 'community') {
-        return { ...prev, community: value, caste: '' };
+        return { ...prev, community: value, subCaste: '' };
       }
 
       return { ...prev, [field]: value };
@@ -378,18 +378,21 @@ const ProfileCreation = () => {
             </div>
           </div>
           <div className="flex flex-col gap-2">
-            <label className="text-sm font-bold text-slate-grey ml-2">Community</label>
+            <label className="text-sm font-bold text-slate-grey ml-2">Community Category *</label>
             <div className="relative">
               <select
                 className="w-full appearance-none bg-white border border-subtle-border rounded-full px-5 py-3 text-charcoal focus:border-rajkumari focus:ring-1 focus:ring-rajkumari transition-all pr-10 shadow-sm cursor-pointer"
                 value={formData.community}
                 onChange={(e) => handleInputChange('community', e.target.value)}
-                disabled={!formData.religion}
               >
-                <option value="">Select Community</option>
-                {formData.religion && communitiesByReligion[formData.religion]?.map((c) => (
-                  <option key={c}>{c}</option>
-                ))}
+                <option value="">Select Community Category</option>
+                <option>General</option>
+                <option>OBC</option>
+                <option>SC</option>
+                <option>ST</option>
+                <option>EBC</option>
+                <option>SEBC</option>
+                <option>EWS</option>
               </select>
               <span className="material-symbols-outlined absolute right-4 top-1/2 -translate-y-1/2 text-slate-grey/50 pointer-events-none">expand_more</span>
             </div>
@@ -397,22 +400,15 @@ const ProfileCreation = () => {
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="flex flex-col gap-2">
-            <label className="text-sm font-bold text-slate-grey ml-2">Caste / Sub-community</label>
-            <div className="relative">
-              <select
-                className="w-full appearance-none bg-white border border-subtle-border rounded-full px-5 py-3 text-charcoal focus:border-rajkumari focus:ring-1 focus:ring-rajkumari transition-all pr-10 shadow-sm cursor-pointer"
-                value={formData.caste}
-                onChange={(e) => handleInputChange('caste', e.target.value)}
-                disabled={!formData.community || formData.religion !== 'Hindu'}
-              >
-                <option value="">Select Caste</option>
-                {formData.community && formData.religion === 'Hindu' && castesByHinduCommunity[formData.community]?.map((c) => (
-                  <option key={c}>{c}</option>
-                ))}
-              </select>
-              <span className="material-symbols-outlined absolute right-4 top-1/2 -translate-y-1/2 text-slate-grey/50 pointer-events-none">expand_more</span>
-            </div>
-            <p className="text-xs text-slate-grey/60 ml-2">Only applicable for Hindu community</p>
+            <label className="text-sm font-bold text-slate-grey ml-2">Sub-Caste / Community</label>
+            <input
+              className="w-full bg-white border border-subtle-border rounded-full px-5 py-3 text-charcoal placeholder-slate-grey/30 focus:border-rajkumari focus:ring-1 focus:ring-rajkumari transition-all shadow-sm"
+              placeholder="e.g., Brahmin, Yadav, Nair"
+              type="text"
+              value={formData.subCaste}
+              onChange={(e) => handleInputChange('subCaste', e.target.value)}
+            />
+            <p className="text-xs text-slate-grey/60 ml-2">Your specific caste or sub-community</p>
           </div>
           <div className="flex flex-col gap-2">
             <label className="text-sm font-bold text-slate-grey ml-2">Mother Tongue *</label>
@@ -1233,7 +1229,7 @@ const ProfileCreation = () => {
         maritalStatus: formData.maritalStatus,
         religion: formData.religion,
         community: formData.community,
-        caste: formData.caste,
+        subCaste: formData.subCaste,
         motherTongue: formData.motherTongue,
         about: formData.aboutText,
         jathagam: formData.jathagam,
