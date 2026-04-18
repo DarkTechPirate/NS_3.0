@@ -5,6 +5,7 @@ import Header from '../components/Header';
 import Footer from '../components/Footer';
 import { getMatchDetail, expressInterest } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { AlertModal } from '../components/Modal';
 
 const MatchDetailScreen = () => {
   const { user } = useAuth();
@@ -16,6 +17,7 @@ const MatchDetailScreen = () => {
   const [match, setMatch] = useState(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
+  const [alertModal, setAlertModal] = useState({ isOpen: false, title: '', message: '', variant: 'default' });
 
   useEffect(() => {
     if (userId) {
@@ -49,10 +51,20 @@ const MatchDetailScreen = () => {
           canMessage: res?.data?.canMessage || prev.canMessage,
         };
       });
-      alert(res?.message || "Interest expressed successfully!");
+      setAlertModal({
+        isOpen: true,
+        title: 'Interest Expressed',
+        message: res?.message || "Interest expressed successfully!",
+        variant: 'success',
+      });
     } catch (error) {
       console.error("Failed to express interest", error);
-      alert(error || "Failed to express interest");
+      setAlertModal({
+        isOpen: true,
+        title: 'Error',
+        message: error?.message || "Failed to express interest",
+        variant: 'error',
+      });
     } finally {
       setActionLoading(false);
     }
@@ -322,6 +334,15 @@ const MatchDetailScreen = () => {
         </div>
       </main>
       <Footer />
+
+      <AlertModal
+        isOpen={alertModal.isOpen}
+        onClose={() => setAlertModal({ ...alertModal, isOpen: false })}
+        title={alertModal.title}
+        message={alertModal.message}
+        variant={alertModal.variant}
+        buttonText="Got it"
+      />
     </div>
   );
 };

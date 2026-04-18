@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
+import { AlertModal } from '../components/Modal';
 
 const Contact = () => {
   const [formData, setFormData] = useState({
@@ -9,11 +10,19 @@ const Contact = () => {
     subject: '',
     message: ''
   });
+  const [alertModal, setAlertModal] = useState({ isOpen: false, title: '', message: '', variant: 'default' });
 
   const handleSubmit = (e) => {
     e.preventDefault();
     // Handle form submission
-    alert('Thank you for your message! We will get back to you shortly.');
+    setAlertModal({
+      isOpen: true,
+      title: 'Message Sent',
+      message: 'Thank you for your message! We will get back to you shortly.',
+      variant: 'success',
+    });
+    // Reset form
+    setFormData({ name: '', email: '', subject: '', message: '' });
   };
 
   return (
@@ -145,6 +154,15 @@ const Contact = () => {
           </div>
         </div>
       </main>
+
+      <AlertModal
+        isOpen={alertModal.isOpen}
+        onClose={() => setAlertModal({ ...alertModal, isOpen: false })}
+        title={alertModal.title}
+        message={alertModal.message}
+        variant={alertModal.variant}
+        buttonText="Got it"
+      />
 
       <Footer />
     </div>

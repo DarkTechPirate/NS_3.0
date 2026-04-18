@@ -4,6 +4,7 @@ import Logo from '../components/Logo';
 import Header from '../components/Header';
 import { deleteGalleryImage, updateProfileInfo, uploadFileWithChunks } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { AlertModal } from '../components/Modal';
 import {
   getFirstMissingProfileSectionFromForm,
   getFirstMissingProfileSectionFromUser,
@@ -67,6 +68,7 @@ const ProfileCreation = () => {
   });
 
   const [initUserRef, setInitUserRef] = useState(null);
+  const [alertModal, setAlertModal] = useState({ isOpen: false, title: '', message: '', variant: 'default' });
 
   // Pre-fill form ONLY when a user initially loads, avoiding a clobber when `setUser` updates locally
   React.useEffect(() => {
@@ -915,7 +917,12 @@ const ProfileCreation = () => {
     if (!file) return;
 
     if (formData.photos.length >= 6) {
-      alert("Maximum 6 photos allowed. Please remove a photo from the gallery first.");
+      setAlertModal({
+        isOpen: true,
+        title: 'Photo Limit Reached',
+        message: 'Maximum 6 photos allowed. Please remove a photo from the gallery first.',
+        variant: 'warning',
+      });
       return;
     }
 
@@ -945,7 +952,12 @@ const ProfileCreation = () => {
       }
     } catch (err) {
       console.error("Upload failed", err);
-      alert("Failed to upload profile picture.");
+      setAlertModal({
+        isOpen: true,
+        title: 'Upload Failed',
+        message: 'Failed to upload profile picture.',
+        variant: 'error',
+      });
     } finally {
       setTimeout(() => setUploadProgress(prev => {
         const next = { ...prev };
@@ -979,7 +991,12 @@ const ProfileCreation = () => {
       }
     } catch (err) {
       console.error("Jathagam upload failed", err);
-      alert("Failed to upload Jathagam");
+      setAlertModal({
+        isOpen: true,
+        title: 'Upload Failed',
+        message: 'Failed to upload Jathagam',
+        variant: 'error',
+      });
     } finally {
       setUploading(false);
       // Keep progress at 100 for a moment then clear
@@ -996,7 +1013,12 @@ const ProfileCreation = () => {
     if (!files || files.length === 0) return;
 
     if (formData.photos.length + files.length > 6) {
-      alert(`Maximum 6 photos allowed. You tried to add ${files.length} but only have space for ${6 - formData.photos.length}.`);
+      setAlertModal({
+        isOpen: true,
+        title: 'Photo Limit Exceeded',
+        message: `Maximum 6 photos allowed. You tried to add ${files.length} but only have space for ${6 - formData.photos.length}.`,
+        variant: 'warning',
+      });
       return;
     }
 
@@ -1030,7 +1052,12 @@ const ProfileCreation = () => {
             }
         } catch (err) {
             console.error("Upload failed", err);
-            alert(`Failed to upload ${file.name}`);
+            setAlertModal({
+                isOpen: true,
+                title: 'Upload Failed',
+                message: `Failed to upload ${file.name}`,
+                variant: 'error',
+            });
         } finally {
             setTimeout(() => setUploadProgress(prev => {
                 const next = { ...prev };
@@ -1063,7 +1090,12 @@ const ProfileCreation = () => {
       }
     } catch (err) {
       console.error("Delete failed", err);
-      alert("Failed to remove image");
+      setAlertModal({
+        isOpen: true,
+        title: 'Delete Failed',
+        message: 'Failed to remove image',
+        variant: 'error',
+      });
     } finally {
       setUploading(false);
     }
@@ -1315,13 +1347,23 @@ const ProfileCreation = () => {
 
         // If in update mode, just save and show success
         if (isUpdateMode) {
-          alert('Profile updated successfully.');
+          setAlertModal({
+            isOpen: true,
+            title: 'Success',
+            message: 'Profile updated successfully.',
+            variant: 'success',
+          });
           return;
         }
 
         // First-time mode: linear flow
         if (isDraft) {
-          alert('Draft saved successfully.');
+          setAlertModal({
+            isOpen: true,
+            title: 'Success',
+            message: 'Draft saved successfully.',
+            variant: 'success',
+          });
           return;
         }
 
@@ -1333,7 +1375,12 @@ const ProfileCreation = () => {
           const missingCurrentSection = getMissingProfileFieldsFromForm(formData, currentSection);
 
           if (missingCurrentSection.length > 0) {
-            alert(`Please complete these details before continuing:\n- ${missingCurrentSection.join('\n- ')}`);
+            setAlertModal({
+              isOpen: true,
+              title: 'Incomplete Section',
+              message: `Please complete these details before continuing:\n- ${missingCurrentSection.join('\n- ')}`,
+              variant: 'warning',
+            });
             return;
           }
 
@@ -1349,9 +1396,19 @@ const ProfileCreation = () => {
             'personal';
 
           if (missingFields.length > 0) {
-            alert(`Please complete these missing details before submitting:\n- ${missingFields.join('\n- ')}`);
+            setAlertModal({
+              isOpen: true,
+              title: 'Incomplete Profile',
+              message: `Please complete these missing details before submitting:\n- ${missingFields.join('\n- ')}`,
+              variant: 'warning',
+            });
           } else {
-            alert('Please complete all required details before submitting.');
+            setAlertModal({
+              isOpen: true,
+              title: 'Incomplete Profile',
+              message: 'Please complete all required details before submitting.',
+              variant: 'warning',
+            });
           }
 
           setActiveSection(missingSection);
@@ -1360,11 +1417,21 @@ const ProfileCreation = () => {
 
         navigate('/dashboard', { replace: true });
       } else {
-        alert("Failed to save: " + res.message);
+        setAlertModal({
+          isOpen: true,
+          title: 'Error',
+          message: "Failed to save: " + res.message,
+          variant: 'error',
+        });
       }
     } catch (err) {
       console.error(err);
-      alert("Error saving profile");
+      setAlertModal({
+        isOpen: true,
+        title: 'Error',
+        message: 'Error saving profile',
+        variant: 'error',
+      });
     } finally {
       setUploading(false);
     }
@@ -1491,6 +1558,14 @@ const ProfileCreation = () => {
           </div>
         </main>
       </div>
+      <AlertModal
+        isOpen={alertModal.isOpen}
+        onClose={() => setAlertModal({ ...alertModal, isOpen: false })}
+        title={alertModal.title}
+        message={alertModal.message}
+        variant={alertModal.variant}
+        buttonText="Got it"
+      />
       <ImageModal src={previewImage} onClose={() => setPreviewImage(null)} />
     </div>
   );

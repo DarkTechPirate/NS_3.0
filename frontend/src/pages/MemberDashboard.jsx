@@ -4,6 +4,7 @@ import Header from '../components/Header';
 import Footer from '../components/Footer';
 import { useAuth } from '../context/AuthContext';
 import { getMatches, expressInterest } from '../services/api';
+import { AlertModal } from '../components/Modal';
 
 const MemberDashboard = () => {
   const { user } = useAuth();
@@ -11,6 +12,7 @@ const MemberDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(null);
   const [matchInsight, setMatchInsight] = useState(null);
+  const [alertModal, setAlertModal] = useState({ isOpen: false, title: '', message: '', variant: 'default' });
 
   const fetchMatchesData = useCallback(async () => {
     try {
@@ -62,10 +64,20 @@ const MemberDashboard = () => {
         })
       );
 
-      alert(res?.message || "Interest expressed successfully! They have been notified.");
+      setAlertModal({
+        isOpen: true,
+        title: 'Interest Expressed',
+        message: res?.message || "Interest expressed successfully! They have been notified.",
+        variant: 'success',
+      });
     } catch (error) {
       console.error("Failed to express interest:", error);
-      alert(error || "Failed to express interest.");
+      setAlertModal({
+        isOpen: true,
+        title: 'Error',
+        message: error?.message || "Failed to express interest.",
+        variant: 'error',
+      });
     } finally {
       setActionLoading(null);
     }
@@ -369,6 +381,15 @@ const MemberDashboard = () => {
       </main>
 
       <Footer />
+
+      <AlertModal
+        isOpen={alertModal.isOpen}
+        onClose={() => setAlertModal({ ...alertModal, isOpen: false })}
+        title={alertModal.title}
+        message={alertModal.message}
+        variant={alertModal.variant}
+        buttonText="Got it"
+      />
     </div>
   );
 };
