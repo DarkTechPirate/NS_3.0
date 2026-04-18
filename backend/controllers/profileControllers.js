@@ -20,6 +20,17 @@ const isPasswordStrong = (password) => {
     return strongRegex.test(password);
 };
 
+const ALLOWED_GENDERS = new Set(["Male", "Female", "Other"]);
+const ALLOWED_COMMUNITIES = new Set([
+    "General",
+    "OBC",
+    "SC",
+    "ST",
+    "EBC",
+    "SEBC",
+    "EWS",
+]);
+
 const createBadRequestError = (message) => {
     const error = new Error(message);
     error.statusCode = 400;
@@ -39,6 +50,33 @@ const sanitizeStringArray = (values) => {
         );
 };
 
+const normalizeGender = (value) => {
+    if (typeof value !== "string") return null;
+
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+
+    const lower = trimmed.toLowerCase();
+    const normalized = lower.charAt(0).toUpperCase() + lower.slice(1);
+    return ALLOWED_GENDERS.has(normalized) ? normalized : null;
+};
+
+const normalizeCommunity = (value) => {
+    if (typeof value !== "string") return null;
+
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+
+    const normalizedUpper = trimmed.toUpperCase();
+    for (const community of ALLOWED_COMMUNITIES) {
+        if (community.toUpperCase() === normalizedUpper) {
+            return community;
+        }
+    }
+
+    return null;
+};
+
 const sanitizeSectionObject = (sectionName, input) => {
     if (!input || typeof input !== "object" || Array.isArray(input)) {
         return {};
@@ -52,6 +90,14 @@ const sanitizeSectionObject = (sectionName, input) => {
         if (typeof value === "string") {
             const trimmed = value.trim();
             if (!trimmed) {
+                return acc;
+            }
+
+            if (sectionName === "personalDetails" && key === "community") {
+                const normalizedCommunity = normalizeCommunity(trimmed);
+                if (normalizedCommunity) {
+                    acc[key] = normalizedCommunity;
+                }
                 return acc;
             }
 
@@ -98,9 +144,9 @@ exports.PersonalInfo = async (req, res) => {
 
         // Gender Update
         if (typeof req.body.gender === "string") {
-            const trimmedGender = req.body.gender.trim();
-            if (trimmedGender) {
-                user.gender = trimmedGender;
+            const normalizedGender = normalizeGender(req.body.gender);
+            if (normalizedGender) {
+                user.gender = normalizedGender;
             }
         }
 
@@ -116,12 +162,9 @@ exports.PersonalInfo = async (req, res) => {
                 if (typeof req.body[section] === 'object' && !Array.isArray(req.body[section])) {
                     const sanitizedSection = sanitizeSectionObject(section, req.body[section]);
                     if (Object.keys(sanitizedSection).length > 0) {
-                        const existingSection =
-                            user[section] && typeof user[section].toObject === "function"
-                                ? user[section].toObject()
-                                : user[section] || {};
-
-                        user[section] = { ...existingSection, ...sanitizedSection };
+                        Object.entries(sanitizedSection).forEach(([key, value]) => {
+                            user.set(`${section}.${key}`, value);
+                        });
                     }
                 } else if (Array.isArray(req.body[section])) {
                     user[section] = sanitizeStringArray(req.body[section]);
@@ -163,7 +206,7 @@ exports.PersonalInfo = async (req, res) => {
             user.password = await bcrypt.hash(password, salt);
         }
 
-        const updatedUser = await user.save();
+        const updatedUser = await user.save({ validateModifiedOnly: true });
 
         // Convert to object and strip password for security
         const userResponse = updatedUser.toObject();

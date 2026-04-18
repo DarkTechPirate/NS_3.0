@@ -14,8 +14,36 @@ import {
   isProfileComplete,
 } from '../utils/profileCompletion';
 import { getBackendBaseUrl } from '../utils/backendUrl';
+
+const COMMUNITY_CATEGORY_OPTIONS = ['General', 'OBC', 'SC', 'ST', 'EBC', 'SEBC', 'EWS'];
+
+const formatDateForInput = (value) => {
+  if (!value) return '';
+
+  const parsedDate = new Date(value);
+  if (Number.isNaN(parsedDate.getTime())) {
+    return '';
+  }
+
+  return parsedDate.toISOString().split('T')[0];
+};
+
+const normalizeCommunityCategory = (value) => {
+  if (typeof value !== 'string') {
+    return '';
+  }
+
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return '';
+  }
+
+  const match = COMMUNITY_CATEGORY_OPTIONS.find((option) => option.toLowerCase() === trimmed.toLowerCase());
+  return match || '';
+};
+
 const ProfileCreation = () => {
-  const { user, setUser } = useAuth();
+  const { user, setUser, loading: authLoading } = useAuth();
   const backendBaseUrl = getBackendBaseUrl();
   const navigate = useNavigate();
   const [activeSection, setActiveSection] = useState('personal');
@@ -67,76 +95,96 @@ const ProfileCreation = () => {
     photos: []
   });
 
-  const [initUserRef, setInitUserRef] = useState(null);
+  const hydratedUserIdRef = React.useRef(null);
   const [alertModal, setAlertModal] = useState({ isOpen: false, title: '', message: '', variant: 'default' });
 
-  // Pre-fill form ONLY when a user initially loads, avoiding a clobber when `setUser` updates locally
+  // Hydrate form after auth verification to avoid stale tab cache values.
   React.useEffect(() => {
-    if (user && user._id !== initUserRef) {
-      setFormData(prev => ({
-        ...prev,
-        // Root Fields
-        firstName: user.fullname ? user.fullname.split(' ')[0] : '',
-        lastName: user.fullname ? user.fullname.split(' ').slice(1).join(' ') : '',
-        gender: user.gender || '',
-
-        // Personal
-        dateOfBirth: user.personalDetails?.dob ? new Date(user.personalDetails.dob).toISOString().split('T')[0] : '',
-        height: user.personalDetails?.height || '',
-        maritalStatus: user.personalDetails?.maritalStatus || 'never-married',
-        religion: user.personalDetails?.religion || '',
-        community: user.personalDetails?.community || '',
-        subCaste: user.personalDetails?.subCaste || '',
-        motherTongue: user.personalDetails?.motherTongue || '',
-        aboutText: user.personalDetails?.about || '',
-        jathagam: user.personalDetails?.jathagam || null,
-
-        // Career
-        highestEducation: user.careerDetails?.education || '',
-        fieldOfStudy: user.careerDetails?.fieldOfStudy || '',
-        institution: user.careerDetails?.institution || '',
-        currentProfession: user.careerDetails?.profession || '',
-        employer: user.careerDetails?.employer || '',
-        annualIncome: user.careerDetails?.income || '',
-        workLocation: user.careerDetails?.workLocation || '',
-
-        // Family
-        fatherName: user.familyDetails?.fatherName || '',
-        fatherOccupation: user.familyDetails?.fatherOccupation || '',
-        motherName: user.familyDetails?.motherName || '',
-        motherOccupation: user.familyDetails?.motherOccupation || '',
-        siblings: user.familyDetails?.siblings || '',
-        familyType: user.familyDetails?.familyType || '',
-        familyValues: user.familyDetails?.familyValues || '',
-        familyLocation: user.familyDetails?.familyLocation || '',
-
-        // Lifestyle
-        dietPreference: user.lifestyleDetails?.diet || '',
-        drinkingHabit: user.lifestyleDetails?.drinking || '',
-        smokingHabit: user.lifestyleDetails?.smoking || '',
-        hobbies: user.lifestyleDetails?.hobbies || [],
-        livingArrangement: user.lifestyleDetails?.livingArrangement || '',
-
-        // Preferences
-        relocate: user.preferences?.relocate || false,
-
-        // Photos
-        photos: user.profileImages?.length ? user.profileImages : (user.profilePicture ? [user.profilePicture] : []),
-      }));
-
-      // Check if user has existing profile data (is an update)
-      const hasExistingProfile = !!(
-        user.personalDetails?.dob ||
-        user.careerDetails?.profession ||
-        user.familyDetails?.fatherName ||
-        user.lifestyleDetails?.diet ||
-        user.profileImages?.length
-      );
-      setIsUpdateMode(hasExistingProfile);
-
-      setInitUserRef(user._id);
+    if (!user) {
+      hydratedUserIdRef.current = null;
+      return;
     }
-  }, [user, initUserRef]);
+
+    if (authLoading) {
+      return;
+    }
+
+    if (hydratedUserIdRef.current === user._id) {
+        return;
+    }
+
+    const communityCategory = normalizeCommunityCategory(user.personalDetails?.community);
+    const legacyCommunityValue =
+      typeof user.personalDetails?.community === 'string'
+        ? user.personalDetails.community.trim()
+        : '';
+
+    setFormData(prev => ({
+      ...prev,
+      // Root Fields
+      firstName: user.fullname ? user.fullname.split(' ')[0] : '',
+      lastName: user.fullname ? user.fullname.split(' ').slice(1).join(' ') : '',
+      gender: user.gender || '',
+
+      // Personal
+      dateOfBirth: formatDateForInput(user.personalDetails?.dob),
+      height: user.personalDetails?.height || '',
+      currentCity: user.personalDetails?.city || user.addresses?.[0]?.city || '',
+      maritalStatus: user.personalDetails?.maritalStatus || 'never-married',
+      religion: user.personalDetails?.religion || '',
+      community: communityCategory,
+      subCaste: user.personalDetails?.subCaste || (!communityCategory ? legacyCommunityValue : ''),
+      motherTongue: user.personalDetails?.motherTongue || '',
+      aboutText: user.personalDetails?.about || '',
+      jathagam: user.personalDetails?.jathagam || null,
+
+      // Career
+      highestEducation: user.careerDetails?.education || '',
+      fieldOfStudy: user.careerDetails?.fieldOfStudy || '',
+      institution: user.careerDetails?.institution || '',
+      currentProfession: user.careerDetails?.profession || '',
+      employer: user.careerDetails?.employer || '',
+      annualIncome: user.careerDetails?.income || '',
+      workLocation: user.careerDetails?.workLocation || '',
+
+      // Family
+      fatherName: user.familyDetails?.fatherName || '',
+      fatherOccupation: user.familyDetails?.fatherOccupation || '',
+      motherName: user.familyDetails?.motherName || '',
+      motherOccupation: user.familyDetails?.motherOccupation || '',
+      siblings: user.familyDetails?.siblings || '',
+      familyType: user.familyDetails?.familyType || '',
+      familyValues: user.familyDetails?.familyValues || '',
+      familyLocation: user.familyDetails?.familyLocation || '',
+
+      // Lifestyle
+      dietPreference: user.lifestyleDetails?.diet || '',
+      drinkingHabit: user.lifestyleDetails?.drinking || '',
+      smokingHabit: user.lifestyleDetails?.smoking || '',
+      hobbies: user.lifestyleDetails?.hobbies || [],
+      livingArrangement: user.lifestyleDetails?.livingArrangement || '',
+
+      // Preferences
+      relocate: user.preferences?.relocate || false,
+
+      // Photos
+      photos: user.profileImages?.length ? user.profileImages : (user.profilePicture ? [user.profilePicture] : []),
+    }));
+
+    // Check if user has existing profile data (is an update)
+    const hasExistingProfile = !!(
+      user.personalDetails?.dob ||
+      user.personalDetails?.city ||
+      user.careerDetails?.profession ||
+      user.familyDetails?.fatherName ||
+      user.lifestyleDetails?.diet ||
+      user.profilePicture ||
+      user.profileImages?.length
+    );
+    setIsUpdateMode(hasExistingProfile);
+
+    hydratedUserIdRef.current = user._id;
+  }, [user, authLoading]);
 
   // Comprehensive Indian Religion, Community, and Caste Data
   const religions = [
@@ -338,6 +386,7 @@ const ProfileCreation = () => {
                 <option value="">Select Gender</option>
                 <option>Male</option>
                 <option>Female</option>
+                <option>Other</option>
               </select>
               <span className="material-symbols-outlined absolute right-4 top-1/2 -translate-y-1/2 text-slate-grey/50 pointer-events-none">expand_more</span>
             </div>
@@ -1459,10 +1508,11 @@ const ProfileCreation = () => {
       }
     } catch (err) {
       console.error(err);
+      const errorMessage = typeof err === 'string' ? err : err?.message || 'Error saving profile';
       setAlertModal({
         isOpen: true,
         title: 'Error',
-        message: 'Error saving profile',
+        message: errorMessage,
         variant: 'error',
       });
     } finally {

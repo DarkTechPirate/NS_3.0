@@ -145,7 +145,7 @@ export const updateProfileInfo = async (data) => {
         const response = await api.put('/profile/info', data);
         return response.data;
     } catch (error) {
-        throw error.response?.data?.message || 'Update failed';
+        throw new Error(error.response?.data?.message || 'Update failed');
     }
 };
 
