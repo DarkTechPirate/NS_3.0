@@ -14,13 +14,13 @@ const MessageBubble = ({ message, isOwn }) => {
   };
 
   return (
-    <div className={`flex ${isOwn ? 'justify-end' : 'justify-start'} mb-4 px-4`}>
-      <div className={`max-w-[75%] md:max-w-[60%] group relative animate-in fade-in slide-in-from-bottom-2`}>
+    <div className={`flex ${isOwn ? 'justify-end' : 'justify-start'} mb-4 px-2 md:px-4`}>
+      <div className="max-w-[75%] md:max-w-[60%] group relative">
         <div className={`
           px-4 py-2 rounded-2xl shadow-sm
           ${isOwn 
-            ? 'bg-primary text-white rounded-br-none' 
-            : 'bg-white border text-text-charcoal rounded-bl-none'
+            ? 'bg-[#C10E62] text-white rounded-br-none border border-[#B20B5A]' 
+            : 'bg-white border border-stone-200 text-text-charcoal rounded-bl-none'
           }
         `}>
           {type === 'IMAGE' && attachments?.length > 0 && (
@@ -53,12 +53,12 @@ const MessageBubble = ({ message, isOwn }) => {
 
           <p className="text-sm whitespace-pre-wrap leading-relaxed">{content}</p>
           
-          <div className={`flex items-center justify-end gap-1.5 mt-1 opacity-70`}>
+          <div className={`flex items-center justify-end gap-1.5 mt-1 ${isOwn ? 'text-white/80' : 'text-stone-400'}`}>
             <span className="text-[10px]">{formatTime(createdAt)}</span>
             {isOwn && (
               <span className="flex">
                 {isRead ? (
-                  <CheckCheck size={14} className="text-blue-200" />
+                  <CheckCheck size={14} className="text-blue-100" />
                 ) : (
                   <Check size={14} />
                 )}

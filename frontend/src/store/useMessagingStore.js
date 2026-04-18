@@ -6,6 +6,22 @@ import { getTabAuthToken } from "../services/api";
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || "http://localhost:5000";
 
+const toId = (value) => String(value?._id ?? value ?? "");
+
+const normalizeMessage = (message = {}) => {
+  const normalizedId = toId(message.id || message._id);
+  const normalizedConversationId = toId(message.conversationId);
+  const normalizedSenderId = toId(message.senderId || message.sender?._id);
+
+  return {
+    ...message,
+    id: normalizedId || message.id,
+    _id: normalizedId || message._id,
+    conversationId: normalizedConversationId || message.conversationId,
+    senderId: normalizedSenderId || message.senderId,
+  };
+};
+
 const getAuthConfig = () => {
   const token = getTabAuthToken();
   const config = { withCredentials: true };
@@ -43,25 +59,38 @@ const useMessagingStore = create((set, get) => ({
       console.log(`[Socket] Connected as ${user.fullname}`);
     });
 
-    socket.on("receive_message", (message) => {
-      console.log("[Socket] Received message:", message);
-      get().addMessage(message);
-      
+    const handleIncomingMessage = (message) => {
+      const normalizedMessage = normalizeMessage(message);
+      console.log("[Socket] Received message:", normalizedMessage);
+      get().addMessage(normalizedMessage);
+
       // Auto-ACK if viewing
       const { activeConversation, markAsRead } = get();
-      if (activeConversation && (activeConversation.id === message.conversationId || String(activeConversation.id) === String(message.conversationId))) {
-        if (message.senderId !== user._id) {
-           markAsRead(message.conversationId);
+      if (
+        activeConversation &&
+        toId(activeConversation.id || activeConversation._id) === toId(normalizedMessage.conversationId)
+      ) {
+        if (toId(normalizedMessage.senderId) !== toId(user._id)) {
+          markAsRead(normalizedMessage.conversationId);
         }
       }
+    };
+
+    socket.on("receive_message", (message) => {
+      handleIncomingMessage(message);
+    });
+
+    // Backward-compatible event name used in some REST flows.
+    socket.on("NEW_MESSAGE", (message) => {
+      handleIncomingMessage(message);
     });
 
     socket.on("conversation_updated", ({ conversationId, lastMessage, updatedAt }) => {
       console.log("[Socket] Conversation updated:", conversationId);
       set((state) => ({
         conversations: state.conversations.map((conv) =>
-          (conv.id === conversationId || String(conv.id) === String(conversationId))
-            ? { ...conv, lastMessage, updatedAt: updatedAt || new Date() }
+          (toId(conv.id || conv._id) === toId(conversationId))
+            ? { ...conv, lastMessage: normalizeMessage(lastMessage), updatedAt: updatedAt || new Date() }
             : conv
         ).sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt)),
       }));
@@ -108,7 +137,7 @@ const useMessagingStore = create((set, get) => ({
       const conversation = res.data.data;
       
       const { conversations } = get();
-      if (!conversations.find(c => c.id === conversation.id)) {
+      if (!conversations.find(c => toId(c.id || c._id) === toId(conversation.id || conversation._id))) {
         set({ conversations: [conversation, ...conversations] });
       }
       
@@ -120,25 +149,32 @@ const useMessagingStore = create((set, get) => ({
 
   setActiveConversation: async (conversation) => {
     const { socket, activeConversation: currentConv } = get();
+    const currentConversationId = toId(currentConv?.id || currentConv?._id);
+    const nextConversationId = toId(conversation?.id || conversation?._id);
     
     // Leave previous room if any
-    if (currentConv && socket) {
-      socket.emit("leave_chat", currentConv.id);
+    if (currentConversationId && socket) {
+      socket.emit("leave_chat", currentConversationId);
     }
 
-    set({ activeConversation: conversation, messages: [], isLoading: true });
+    if (!conversation) {
+      set({ activeConversation: null, messages: [], isLoading: false });
+      return;
+    }
+
+    set({ activeConversation: { ...conversation, id: nextConversationId || conversation.id }, messages: [], isLoading: true });
     
     // Join new room
-    if (conversation && socket) {
-      socket.emit("join_chat", conversation.id);
+    if (nextConversationId && socket) {
+      socket.emit("join_chat", nextConversationId);
     }
 
     try {
-      const res = await axios.get(`${API_URL}/messaging/conversations/${conversation.id}/messages`, getAuthConfig());
-      set({ messages: res.data.data, isLoading: false });
+      const res = await axios.get(`${API_URL}/messaging/conversations/${nextConversationId}/messages`, getAuthConfig());
+      set({ messages: (res.data.data || []).map(normalizeMessage), isLoading: false });
       
       // Mark as read
-      get().markAsRead(conversation.id);
+      get().markAsRead(nextConversationId);
     } catch (error) {
       set({ error: error.message, isLoading: false });
     }
@@ -148,9 +184,10 @@ const useMessagingStore = create((set, get) => ({
     const { activeConversation, socket } = get();
     
     // Use socket if it's a simple text message and we have a conversation
-    if (socket && activeConversation && attachments.length === 0 && !metadata) {
+    if (socket?.connected && activeConversation && attachments.length === 0 && !metadata) {
+       const conversationId = toId(activeConversation.id || activeConversation._id);
        socket.emit("send_message", {
-         conversationId: activeConversation.id,
+         conversationId,
          content,
          type: "TEXT"
        });
@@ -162,7 +199,7 @@ const useMessagingStore = create((set, get) => ({
       const res = await axios.post(
         `${API_URL}/messaging/messages`,
         {
-          conversationId: activeConversation?.id,
+          conversationId: toId(activeConversation?.id || activeConversation?._id),
           recipientId,
           content,
           attachments,
@@ -171,7 +208,7 @@ const useMessagingStore = create((set, get) => ({
         getAuthConfig()
       );
       
-      const message = res.data.data;
+      const message = normalizeMessage(res.data.data);
       get().addMessage(message);
       
       if (!activeConversation) {
@@ -186,19 +223,22 @@ const useMessagingStore = create((set, get) => ({
 
   addMessage: (message) => {
     const { activeConversation, messages } = get();
+    const normalizedMessage = normalizeMessage(message);
+    const messageId = toId(normalizedMessage.id || normalizedMessage._id);
+    const activeConversationId = toId(activeConversation?.id || activeConversation?._id);
     
     // Prevent duplicates
-    if (messages.find(m => (m.id || m._id) === (message.id || message._id))) return;
+    if (messages.find(m => toId(m.id || m._id) === messageId)) return;
 
-    if (activeConversation && (message.conversationId === activeConversation.id || String(message.conversationId) === String(activeConversation.id))) {
-      set({ messages: [...messages, { ...message, id: message._id || message.id }] });
+    if (activeConversationId && toId(normalizedMessage.conversationId) === activeConversationId) {
+      set({ messages: [...messages, normalizedMessage] });
     }
 
     // Update conversation preview in list
     set((state) => ({
       conversations: state.conversations.map((conv) =>
-        (conv.id === message.conversationId || String(conv.id) === String(message.conversationId))
-          ? { ...conv, lastMessage: message, updatedAt: message.createdAt || new Date() }
+        (toId(conv.id || conv._id) === toId(normalizedMessage.conversationId))
+          ? { ...conv, lastMessage: normalizedMessage, updatedAt: normalizedMessage.createdAt || new Date() }
           : conv
       ).sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt)),
     }));
@@ -209,7 +249,7 @@ const useMessagingStore = create((set, get) => ({
       await axios.put(`${API_URL}/messaging/conversations/${conversationId}/read`, {}, getAuthConfig());
       set((state) => ({
         messages: state.messages.map((msg) =>
-          msg.senderId !== state.user?._id ? { ...msg, isRead: true } : msg
+          toId(msg.senderId) !== toId(state.user?._id) ? { ...msg, isRead: true } : msg
         )
       }));
       // Update local conversation list
@@ -222,10 +262,10 @@ const useMessagingStore = create((set, get) => ({
 
   handleMessagesRead: (conversationId, readerId, readAt) => {
     const { activeConversation, messages } = get();
-    if (activeConversation?.id === conversationId || String(activeConversation?.id) === String(conversationId)) {
+    if (toId(activeConversation?.id || activeConversation?._id) === toId(conversationId)) {
       set({
         messages: messages.map((msg) =>
-          msg.senderId !== readerId && !msg.isRead 
+          toId(msg.senderId) !== toId(readerId) && !msg.isRead 
             ? { ...msg, isRead: true, readAt: readAt || new Date() } 
             : msg
         ),
@@ -234,11 +274,11 @@ const useMessagingStore = create((set, get) => ({
     
     set((state) => ({
       conversations: state.conversations.map((conv) =>
-        (conv.id === conversationId || String(conv.id) === String(conversationId))
+        (toId(conv.id || conv._id) === toId(conversationId))
           ? {
               ...conv,
               members: conv.members.map((m) =>
-                m.userId === readerId ? { ...m, lastReadAt: readAt || new Date() } : m
+                toId(m.userId) === toId(readerId) ? { ...m, lastReadAt: readAt || new Date() } : m
               ),
             }
           : conv

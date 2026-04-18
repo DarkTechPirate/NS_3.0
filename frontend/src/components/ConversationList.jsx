@@ -7,22 +7,23 @@ const ConversationList = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const { conversations, activeConversation, setActiveConversation, isLoading } = useMessagingStore();
   const { user } = useAuth();
+  const toId = (value) => String(value?._id ?? value ?? '');
 
   const filteredConversations = conversations.filter(conv => {
-    const otherUser = conv.participants.find(p => p._id !== user?._id);
+    const otherUser = conv.participants.find(p => toId(p._id) !== toId(user?._id));
     return otherUser?.fullname?.toLowerCase().includes(searchQuery.toLowerCase());
   });
 
   const getOtherUser = (conv) => {
-    return conv.participants.find(p => p._id !== user?._id) || { fullname: 'Deleted User' };
+    return conv.participants.find(p => toId(p._id) !== toId(user?._id)) || { fullname: 'Deleted User' };
   };
 
   const getUnreadCount = (conv) => {
     // Basic logic: if last message is not by current user and its createdAt > lastReadAt of current user
     const lastMessage = conv.lastMessage;
-    if (!lastMessage || lastMessage.senderId === user?._id) return 0;
+    if (!lastMessage || toId(lastMessage.senderId || lastMessage.sender?._id) === toId(user?._id)) return 0;
     
-    const member = conv.members.find(m => m.userId === user?._id);
+    const member = conv.members.find(m => toId(m.userId) === toId(user?._id));
     if (!member) return 0;
     
     return new Date(lastMessage.createdAt) > new Date(member.lastReadAt) ? 1 : 0;
@@ -55,7 +56,7 @@ const ConversationList = () => {
         ) : filteredConversations.length > 0 ? (
           filteredConversations.map((conv) => {
             const otherUser = getOtherUser(conv);
-            const isActive = activeConversation?.id === conv.id;
+            const isActive = toId(activeConversation?.id || activeConversation?._id) === toId(conv.id || conv._id);
             const unreadCount = getUnreadCount(conv);
 
             return (

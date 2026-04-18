@@ -3,6 +3,24 @@ const Conversation = require('../models/Conversation');
 const Match = require('../models/Match');
 const User = require('../models/userModel');
 
+const toId = (value) => String(value?._id ?? value ?? '');
+
+const toClientMessage = (message, sender = null) => {
+  if (!message) return null;
+
+  const source = typeof message.toObject === 'function' ? message.toObject() : message;
+  const normalizedId = toId(source._id || source.id);
+
+  return {
+    ...source,
+    _id: normalizedId,
+    id: normalizedId,
+    conversationId: toId(source.conversationId),
+    senderId: toId(source.senderId),
+    sender: sender || source.sender || null,
+  };
+};
+
 const hasMutualInterest = async (userAId, userBId) => {
   const [aToB, bToA] = await Promise.all([
     Match.findOne({ user: userAId, matchedUser: userBId, isDeleted: false }).select('interestExpressed mutualInterest'),
@@ -85,11 +103,7 @@ class SocketService {
           });
 
           const sender = await User.findById(userId).select('fullname profilePicture');
-          const messageData = {
-            ...message.toObject(),
-            sender,
-            id: message._id
-          };
+          const messageData = toClientMessage(message, sender);
 
           // Update conversation heartbeat
           await Conversation.findByIdAndUpdate(conversationId, { updatedAt: new Date() });
@@ -102,7 +116,7 @@ class SocketService {
             const memberId = member.userId.toString();
             // This will reach them if they are online, regardless of which room they are in
             this.io.to(memberId).emit('conversation_updated', {
-              conversationId,
+              conversationId: toId(conversationId),
               lastMessage: messageData,
               updatedAt: new Date()
             });

@@ -10,6 +10,8 @@ const ChatWindow = ({ isMobile, onBack }) => {
   const { user } = useAuth();
   const scrollRef = useRef(null);
 
+  const toId = (value) => String(value?._id ?? value ?? '');
+
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
@@ -59,7 +61,7 @@ const ChatWindow = ({ isMobile, onBack }) => {
       {/* Messages Area */}
       <div 
         ref={scrollRef}
-        className="flex-1 overflow-y-auto p-4 space-y-2 custom-scrollbar bg-chat-pattern bg-blend-soft-light"
+        className="flex-1 overflow-y-auto p-4 space-y-2 custom-scrollbar bg-[#fbfbfd]"
       >
         {isLoading && messages.length === 0 ? (
           <div className="flex items-center justify-center h-full opacity-50">
@@ -76,7 +78,7 @@ const ChatWindow = ({ isMobile, onBack }) => {
               <MessageBubble 
                 key={msg.id || msg._id} 
                 message={msg} 
-                isOwn={msg.senderId === user?._id} 
+                isOwn={toId(msg.senderId || msg.sender?._id) === toId(user?._id)} 
               />
             ))}
           </>

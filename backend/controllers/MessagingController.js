@@ -5,6 +5,24 @@ const User = require("../models/userModel");
 const socketService = require("../services/socketService");
 const Notification = require("../models/Notification");
 
+const toId = (value) => String(value?._id ?? value ?? "");
+
+const toClientMessage = (message, sender = null) => {
+  if (!message) return null;
+
+  const source = typeof message.toObject === "function" ? message.toObject() : message;
+  const normalizedId = toId(source._id || source.id);
+
+  return {
+    ...source,
+    _id: normalizedId,
+    id: normalizedId,
+    conversationId: toId(source.conversationId),
+    senderId: toId(source.senderId),
+    sender: sender || source.sender || null,
+  };
+};
+
 const hasMutualInterest = async (userAId, userBId) => {
   const [aToB, bToA] = await Promise.all([
     Match.findOne({ user: userAId, matchedUser: userBId, isDeleted: false }).select("interestExpressed mutualInterest"),
@@ -59,7 +77,7 @@ exports.getConversations = async (req, res) => {
           ...convObj,
           id: convObj._id,
           participants: otherUsers,
-          lastMessage,
+          lastMessage: toClientMessage(lastMessage),
         };
       })
     );
@@ -97,14 +115,12 @@ exports.getMessages = async (req, res) => {
         _id: { $in: senderIds }
     }).select('fullname profilePicture');
 
-    const enrichedMessages = messages.map((msg) => {
-      const msgObj = msg.toObject();
-      return {
-        ...msgObj,
-        id: msgObj._id,
-        sender: senders.find((s) => s._id.toString() === msg.senderId.toString()),
-      };
-    });
+    const enrichedMessages = messages.map((msg) =>
+      toClientMessage(
+        msg,
+        senders.find((s) => s._id.toString() === msg.senderId.toString())
+      )
+    );
 
     // Update last read time for this user
     await Conversation.updateOne(
@@ -215,17 +231,18 @@ exports.sendMessage = async (req, res) => {
     await Conversation.findByIdAndUpdate(targetConv._id, { updatedAt: new Date() });
 
     // Broadcast via SSE
-    const messageData = {
-        ...message.toObject(),
-        sender,
-        id: message._id
-    };
+    const messageData = toClientMessage(message, sender);
 
-    targetConv.members.forEach(member => {
-        socketService.notifyUser(member.userId.toString(), "NEW_MESSAGE", messageData);
-        // Also update conversation list for all members
-        socketService.notifyUser(member.userId.toString(), "conversation_updated", {
-            conversationId: targetConv._id,
+    const memberIds = targetConv.members.map((member) => member.userId.toString());
+
+    memberIds.forEach((memberId) => {
+      // Primary real-time event expected by frontend chat pane.
+      socketService.notifyUser(memberId, "receive_message", messageData);
+      // Backward-compatible event for older listeners.
+      socketService.notifyUser(memberId, "NEW_MESSAGE", messageData);
+      // Also update conversation list for all members.
+      socketService.notifyUser(memberId, "conversation_updated", {
+        conversationId: toId(targetConv._id),
             lastMessage: messageData,
             updatedAt: new Date()
         });
