@@ -53,18 +53,9 @@ const UserSchema = new Schema(
             height: String,
             maritalStatus: String,
             religion: String,
-            community: {
-                type: String,
-                enum: [
-                    "General",
-                    "OBC",
-                    "SC",
-                    "ST",
-                    "EBC",
-                    "SEBC",
-                    "EWS"
-                ]
-            },
+            // Keep this flexible: legacy data and seeded users may store caste/community names
+            // (e.g. "Brahmin") instead of reservation category labels.
+            community: { type: String, trim: true },
             subCaste: String,
             motherTongue: String,
             city: String,

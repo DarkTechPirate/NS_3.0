@@ -74,7 +74,7 @@ const normalizeCommunity = (value) => {
         }
     }
 
-    return null;
+    return trimmed;
 };
 
 const sanitizeSectionObject = (sectionName, input) => {
