@@ -401,13 +401,20 @@ const ProfileCreation = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="flex flex-col gap-2">
             <label className="text-sm font-bold text-slate-grey ml-2">Sub-Caste / Community</label>
-            <input
-              className="w-full bg-white border border-subtle-border rounded-full px-5 py-3 text-charcoal placeholder-slate-grey/30 focus:border-rajkumari focus:ring-1 focus:ring-rajkumari transition-all shadow-sm"
-              placeholder="e.g., Brahmin, Yadav, Nair"
-              type="text"
-              value={formData.subCaste}
-              onChange={(e) => handleInputChange('subCaste', e.target.value)}
-            />
+            <div className="relative">
+              <select
+                className="w-full appearance-none bg-white border border-subtle-border rounded-full px-5 py-3 text-charcoal focus:border-rajkumari focus:ring-1 focus:ring-rajkumari transition-all pr-10 shadow-sm cursor-pointer"
+                value={formData.subCaste}
+                onChange={(e) => handleInputChange('subCaste', e.target.value)}
+                disabled={!formData.religion}
+              >
+                <option value="">Select Sub-Caste</option>
+                {formData.religion && communitiesByReligion[formData.religion]?.map((c) => (
+                  <option key={c}>{c}</option>
+                ))}
+              </select>
+              <span className="material-symbols-outlined absolute right-4 top-1/2 -translate-y-1/2 text-slate-grey/50 pointer-events-none">expand_more</span>
+            </div>
             <p className="text-xs text-slate-grey/60 ml-2">Your specific caste or sub-community</p>
           </div>
           <div className="flex flex-col gap-2">
