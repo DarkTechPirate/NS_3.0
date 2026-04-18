@@ -1257,9 +1257,40 @@ const ProfileCreation = () => {
     }
   };
 
+  const sanitizePayload = (value) => {
+    if (Array.isArray(value)) {
+      return value
+        .map((item) => sanitizePayload(item))
+        .filter((item) => item !== undefined);
+    }
+
+    if (value && typeof value === 'object') {
+      const sanitizedEntries = Object.entries(value)
+        .map(([key, item]) => [key, sanitizePayload(item)])
+        .filter(([, item]) => item !== undefined);
+
+      if (sanitizedEntries.length === 0) {
+        return undefined;
+      }
+
+      return Object.fromEntries(sanitizedEntries);
+    }
+
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      return trimmed.length > 0 ? trimmed : undefined;
+    }
+
+    if (value === null || value === undefined) {
+      return undefined;
+    }
+
+    return value;
+  };
+
   // Transform flat formData to nested backend schema
   const getPayload = () => {
-    return {
+    const rawPayload = {
       gender: formData.gender,
       personalDetails: {
         dob: formData.dateOfBirth,
@@ -1303,9 +1334,11 @@ const ProfileCreation = () => {
         relocate: formData.relocate,
       },
       profileImages: formData.photos, // Array of URLs
-      profilePicture: formData.photos[0] || '', // Provide avatar sync
+      profilePicture: formData.photos[0],
       fullName: `${formData.firstName} ${formData.lastName}`.trim(),
     };
+
+    return sanitizePayload(rawPayload) || {};
   };
 
   const handleSave = async (isDraft = false) => {
@@ -1317,30 +1350,30 @@ const ProfileCreation = () => {
       if (res.success) {
         const nextUser = res.user || {
           ...user,
-          fullname: payload.fullName,
-          gender: payload.gender,
+          fullname: payload.fullName ?? user?.fullname,
+          gender: payload.gender ?? user?.gender,
           personalDetails: {
             ...(user?.personalDetails || {}),
-            ...payload.personalDetails,
+            ...(payload.personalDetails || {}),
           },
           careerDetails: {
             ...(user?.careerDetails || {}),
-            ...payload.careerDetails,
+            ...(payload.careerDetails || {}),
           },
           familyDetails: {
             ...(user?.familyDetails || {}),
-            ...payload.familyDetails,
+            ...(payload.familyDetails || {}),
           },
           lifestyleDetails: {
             ...(user?.lifestyleDetails || {}),
-            ...payload.lifestyleDetails,
+            ...(payload.lifestyleDetails || {}),
           },
           preferences: {
             ...(user?.preferences || {}),
-            ...payload.preferences,
+            ...(payload.preferences || {}),
           },
-          profileImages: payload.profileImages,
-          profilePicture: payload.profilePicture,
+          profileImages: payload.profileImages ?? user?.profileImages ?? [],
+          profilePicture: payload.profilePicture ?? user?.profilePicture,
         };
 
         setUser(nextUser);

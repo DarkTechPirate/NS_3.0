@@ -20,6 +20,64 @@ const isPasswordStrong = (password) => {
     return strongRegex.test(password);
 };
 
+const createBadRequestError = (message) => {
+    const error = new Error(message);
+    error.statusCode = 400;
+    return error;
+};
+
+const sanitizeStringArray = (values) => {
+    if (!Array.isArray(values)) return [];
+
+    return values
+        .map((value) => (typeof value === "string" ? value.trim() : value))
+        .filter(
+            (value) =>
+                value !== undefined &&
+                value !== null &&
+                !(typeof value === "string" && value.length === 0)
+        );
+};
+
+const sanitizeSectionObject = (sectionName, input) => {
+    if (!input || typeof input !== "object" || Array.isArray(input)) {
+        return {};
+    }
+
+    return Object.entries(input).reduce((acc, [key, value]) => {
+        if (value === undefined || value === null) {
+            return acc;
+        }
+
+        if (typeof value === "string") {
+            const trimmed = value.trim();
+            if (!trimmed) {
+                return acc;
+            }
+
+            if (sectionName === "personalDetails" && key === "dob") {
+                const parsedDate = new Date(trimmed);
+                if (Number.isNaN(parsedDate.getTime())) {
+                    throw createBadRequestError("Invalid date of birth format");
+                }
+                acc[key] = parsedDate;
+                return acc;
+            }
+
+            acc[key] = trimmed;
+            return acc;
+        }
+
+        if (Array.isArray(value)) {
+            acc[key] = sanitizeStringArray(value);
+            return acc;
+        }
+
+        acc[key] = value;
+        return acc;
+    }, {});
+};
+
 // --- 1. Personal Info Update ---
 exports.PersonalInfo = async (req, res) => {
     try {
@@ -39,8 +97,11 @@ exports.PersonalInfo = async (req, res) => {
         }
 
         // Gender Update
-        if (req.body.gender) {
-            user.gender = req.body.gender;
+        if (typeof req.body.gender === "string") {
+            const trimmedGender = req.body.gender.trim();
+            if (trimmedGender) {
+                user.gender = trimmedGender;
+            }
         }
 
         // --- NEW: Universal Update Logic for Profile Sections ---
@@ -48,21 +109,32 @@ exports.PersonalInfo = async (req, res) => {
         const sections = ['personalDetails', 'careerDetails', 'familyDetails', 'lifestyleDetails', 'preferences', 'profileImages'];
 
         sections.forEach(section => {
-            if (req.body[section]) {
+            if (req.body[section] !== undefined) {
                 // If the section exists in the body, update the user model
                 // For objects (like personalDetails), we merge. For arrays (hobbies, profileImages), we replace or merge carefully.
                 // Simple merge strategy:
                 if (typeof req.body[section] === 'object' && !Array.isArray(req.body[section])) {
-                    user[section] = { ...user[section], ...req.body[section] };
-                } else {
-                    user[section] = req.body[section];
+                    const sanitizedSection = sanitizeSectionObject(section, req.body[section]);
+                    if (Object.keys(sanitizedSection).length > 0) {
+                        const existingSection =
+                            user[section] && typeof user[section].toObject === "function"
+                                ? user[section].toObject()
+                                : user[section] || {};
+
+                        user[section] = { ...existingSection, ...sanitizedSection };
+                    }
+                } else if (Array.isArray(req.body[section])) {
+                    user[section] = sanitizeStringArray(req.body[section]);
                 }
             }
         });
 
         // Profile Picture Update
-        if (req.body.profilePicture) {
-            user.profilePicture = req.body.profilePicture;
+        if (typeof req.body.profilePicture === "string") {
+            const trimmedPicturePath = req.body.profilePicture.trim();
+            if (trimmedPicturePath) {
+                user.profilePicture = trimmedPicturePath;
+            }
         }
 
         // Indian Phone Validation
@@ -104,10 +176,32 @@ exports.PersonalInfo = async (req, res) => {
         });
     } catch (error) {
         console.error("Update Profile Error:", error);
-        res.status(500).json({
+
+        if (error.statusCode === 400) {
+            return res.status(400).json({
+                success: false,
+                message: error.message,
+            });
+        }
+
+        if (error.name === "ValidationError") {
+            const firstValidationError = Object.values(error.errors || {})[0];
+            return res.status(400).json({
+                success: false,
+                message: firstValidationError?.message || "Invalid profile data",
+            });
+        }
+
+        if (error.name === "CastError") {
+            return res.status(400).json({
+                success: false,
+                message: error.message || "Invalid profile data",
+            });
+        }
+
+        return res.status(500).json({
             success: false,
             message: "Internal server error",
-            error: error.message,
         });
     }
 };
