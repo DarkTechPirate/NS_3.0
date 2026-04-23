@@ -121,6 +121,17 @@ const Header = ({ variant = 'default' }) => {
                 {link.label}
               </Link>
             ))}
+            
+            {/* Animated Venue Button */}
+            <a 
+              href="https://venues.nammasambandhi.com/" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="venue-ad-button"
+            >
+              <span className="material-symbols-outlined text-sm">location_on</span>
+              Venue
+            </a>
           </nav>
 
           {/* Right Section */}
