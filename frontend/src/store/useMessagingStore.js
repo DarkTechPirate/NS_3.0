@@ -50,6 +50,7 @@ const useMessagingStore = create((set, get) => ({
     const tabToken = getTabAuthToken();
 
     const socket = io(SOCKET_URL, {
+      path: '/ws/',
       withCredentials: true,
       autoConnect: true,
       auth: tabToken ? { token: tabToken } : {},

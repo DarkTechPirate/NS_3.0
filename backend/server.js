@@ -22,6 +22,7 @@ const { protect } = require('./middleware/authMiddleware');
 
 
 const app = express();
+app.set('trust proxy', 1);
 const PORT = process.env.PORT || 5000;
 
 const corsOptions = {
@@ -148,6 +149,7 @@ server.headersTimeout = 66000;
 // Initialize Socket.io
 const { Server } = require('socket.io');
 const io = new Server(server, {
+  path: '/ws/',
   cors: {
     origin: process.env.CLIENT_URL || 'http://localhost:5178',
     credentials: true,
