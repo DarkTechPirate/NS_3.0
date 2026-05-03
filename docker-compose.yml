@@ -1,43 +1,23 @@
 version: "3.9"
 
 services:
-  backend:
+  app:
     build:
-      context: ./backend
+      context: .
       dockerfile: Dockerfile
-    container_name: ns_30-backend
+    container_name: ns_30-app
     restart: unless-stopped
-    # Mapping host 5002 to container 5000
     ports:
-      - "127.0.0.1:5002:5000"
+      - "127.0.0.1:3002:3000"
     networks:
       - infra_internal
     env_file:
       - ./backend/.env
     environment:
-      PORT: 5000
+      PORT: 3002
       NODE_ENV: production
-    # Resource limits like your working example
-    cpus: "0.75"
-    mem_limit: 1g
-
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-      args:
-        - VITE_API_URL=${VITE_API_URL:-https://api.nammasambandhi.com/api}
-        - VITE_SOCKET_URL=${VITE_SOCKET_URL:-https://api.nammasambandhi.com}
-    container_name: ns_30-frontend
-    restart: unless-stopped
-    ports:
-      - "127.0.0.1:5178:80"
-    networks:
-      - infra_internal
-    depends_on:
-      - backend
-    cpus: "0.10"
-    mem_limit: 128m
+    cpus: "1.0"
+    mem_limit: 1.5g
 
 networks:
   infra_internal:
